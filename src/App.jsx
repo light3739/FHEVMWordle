@@ -9,6 +9,8 @@ import StatsModal from 'components/StatsModal';
 import WalletModal from 'components/WalletModal';
 import useLocalStorage from 'hooks/useLocalStorage';
 import useAlert from 'hooks/useAlert';
+import { getUniversalConnector } from 'hooks/useWallet';
+
 import {
   solution,
   solutionIndex,
@@ -59,12 +61,37 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(theme === 'dark');
   const [isHighContrastMode, setIsHighContrastMode] = useState(highContrast);
   const { showAlert } = useAlert();
+  // Wallet state
+  const [universalConnector, setUniversalConnector] = useState();
+  const [session, setSession] = useState();
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // Show welcome modal
   useEffect(() => {
     if (!boardState.solutionIndex)
       setTimeout(() => setIsInfoModalOpen(true), 1000);
     // eslint-disable-next-line
+  }, []);
+
+  // Initialize Universal Connector
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const uc = await getUniversalConnector();
+        if (mounted) setUniversalConnector(uc);
+      } catch (e) {
+        console.error('Wallet init failed', e);
+        showAlert('Wallet init failed', 'error');
+      }
+    })();
+    return () => {
+      mounted = false;
+      try {
+        universalConnector?.removeAllListeners?.();
+      } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save boardState to localStorage
@@ -107,6 +134,39 @@ function App() {
       document.body.setAttribute('data-mode', 'high-contrast');
     else document.body.removeAttribute('data-mode');
   }, [isDarkMode, isHighContrastMode]);
+  // (legacy handlers removed; using new handlers below)
+
+  // Wallet connect/disconnect
+  const handleConnectWallet = async () => {
+    if (!universalConnector) {
+      showAlert('Wallet not ready', 'error');
+      return;
+    }
+    setIsConnecting(true);
+    try {
+      const result = await (universalConnector.connect?.() ||
+        Promise.reject(new Error('Connect not available')));
+      const newSession = result?.session || result;
+      setSession(newSession);
+      setIsWalletModalOpen(false);
+      showAlert('Wallet connected', 'success');
+    } catch (e) {
+      console.error('Connect failed', e);
+      showAlert(e?.message || 'Wallet connect failed', 'error');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnectWallet = async () => {
+    try {
+      await universalConnector?.disconnect?.();
+    } catch (e) {
+      console.warn('Disconnect issue', e);
+    }
+    setSession(undefined);
+    showAlert('Wallet disconnected', 'success');
+  };
 
   const handleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
@@ -211,9 +271,10 @@ function App() {
       <WalletModal
         isOpen={isWalletModalOpen}
         onClose={() => setIsWalletModalOpen(false)}
-        isHardMode={isHardMode}
-        isDarkMode={isDarkMode}
-        isHighContrastMode={isHighContrastMode}
+        isConnecting={isConnecting}
+        session={session}
+        onConnect={handleConnectWallet}
+        onDisconnect={handleDisconnectWallet}
       />
     </div>
   );

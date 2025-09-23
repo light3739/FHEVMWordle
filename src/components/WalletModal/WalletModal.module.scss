@@ -37,3 +37,43 @@
 .isOn {
   background: var(--color-toggle);
 }
+
+/* Basic modal styles used by WalletModal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+}
+
+.isOpen {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.content {
+  background: var(--color-background, #111);
+  color: var(--color-text, #fff);
+  width: 90%;
+  max-width: 460px;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.section {
+  margin-top: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+}
