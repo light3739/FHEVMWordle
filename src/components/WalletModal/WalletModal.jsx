@@ -1,9 +1,8 @@
 import classNames from 'classnames';
-import { useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import styles from './WalletModal.module.scss';
-import { createAppKit } from '@reown/appkit'
-import { mainnet, arbitrum } from '@reown/appkit/networks'
-import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+import Web3Modal from 'web3modal';
+import { ethers } from 'ethers';
 const WalletModal = ({
   isOpen,
   onClose,
@@ -13,6 +12,13 @@ const WalletModal = ({
   onDisconnect,
 }) => {
   const ref = useRef();
+  const [connecting, setConnecting] = useState(false);
+  const [localSession, setLocalSession] = useState(null);
+  const effectiveSession = session || localSession;
+
+  const web3Modal = useMemo(() => {
+    return new Web3Modal({ cacheProvider: false, providerOptions: {} });
+  }, []);
 
   const classes = classNames({
     [styles.modal]: true,
@@ -22,6 +28,36 @@ const WalletModal = ({
   const stop = e => {
     // Prevent closing when clicking inside content
     e.stopPropagation();
+  };
+
+  const handleConnect = async () => {
+    try {
+      setConnecting(true);
+      const provider = await web3Modal.connect();
+      const ethersProvider = new ethers.BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+      const address = await signer.getAddress();
+      const sess = { address, provider, signer };
+      setLocalSession(sess);
+      if (onConnect) onConnect(sess);
+    } catch (e) {
+      // silently ignore cancel
+      // console.error('Web3Modal connect error', e)
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      const p = effectiveSession?.provider;
+      await p?.disconnect?.();
+    } catch {}
+    try {
+      await web3Modal.clearCachedProvider?.();
+    } catch {}
+    setLocalSession(null);
+    if (onDisconnect) onDisconnect();
   };
 
   return (
@@ -36,24 +72,27 @@ const WalletModal = ({
     >
       <div className={styles.content} onClick={stop}>
         <h2>Wallet</h2>
-        {session ? (
+        {effectiveSession ? (
           <div className={styles.section}>
             <div className={styles.row}>
               <span>Status:</span>
               <strong>Connected</strong>
             </div>
-            {session.address && (
+            {effectiveSession.address && (
               <div className={styles.row}>
                 <span>Address:</span>
-                <code>{session.address}</code>
+                <code>{effectiveSession.address}</code>
               </div>
             )}
-            <button onClick={onDisconnect}>Disconnect</button>
+            <button onClick={handleDisconnect}>Disconnect</button>
           </div>
         ) : (
           <div className={styles.section}>
-            <button onClick={onConnect} disabled={isConnecting}>
-              {isConnecting ? 'Connecting…' : 'Connect Wallet'}
+            <button
+              onClick={handleConnect}
+              disabled={isConnecting || connecting}
+            >
+              {isConnecting || connecting ? 'Connecting…' : 'Connect Wallet'}
             </button>
           </div>
         )}

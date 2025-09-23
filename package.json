@@ -7,6 +7,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "classnames": "^2.3.1",
+    "ethers": "^6.15.0",
     "react": "^18.2.0",
     "react-countdown": "^2.3.2",
     "react-dom": "^18.2.0",
@@ -14,7 +15,8 @@
     "react-scripts": "5.0.0",
     "react-transition-group": "^4.4.2",
     "sass": "^1.49.9",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "web3modal": "^1.9.12"
   },
   "scripts": {
     "start": "react-scripts start",
