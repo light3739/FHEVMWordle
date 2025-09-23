@@ -22,6 +22,7 @@ import {
 } from 'constants/settings';
 import styles from './App.module.scss';
 import 'styles/_transitionStyles.scss';
+import WalletModal from 'components/WalletModal';
 
 function App() {
   const [boardState, setBoardState] = useLocalStorage('boardState', {
@@ -52,6 +53,7 @@ function App() {
   const [isGameLost, setIsGameLost] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isHardMode, setIsHardMode] = useState(hardMode);
   const [isDarkMode, setIsDarkMode] = useState(theme === 'dark');
@@ -90,6 +92,15 @@ function App() {
     }
     // eslint-disable-next-line
   }, [guesses]);
+
+  // Handle wallet connection
+  useEffect(() => {
+    if (isWalletModalOpen) document.body.setAttribute('data-wallet', 'open');
+    else document.body.removeAttribute('data-wallet');
+  }, [isWalletModalOpen]);
+
+
+  
 
   useEffect(() => {
     if (isDarkMode) document.body.setAttribute('data-theme', 'dark');
@@ -160,6 +171,7 @@ function App() {
         setIsInfoModalOpen={setIsInfoModalOpen}
         setIsStatsModalOpen={setIsStatsModalOpen}
         setIsSettingsModalOpen={setIsSettingsModalOpen}
+        setIsWalletModalOpen={setIsWalletModalOpen}
       />
       <Alert />
       <Grid
@@ -198,6 +210,13 @@ function App() {
         isHardMode={isHardMode}
         guesses={guesses}
         showAlert={showAlert}
+      />
+      <WalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
+        isHardMode={isHardMode}
+        isDarkMode={isDarkMode}
+        isHighContrastMode={isHighContrastMode}
       />
     </div>
   );
