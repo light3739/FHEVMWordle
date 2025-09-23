@@ -6,6 +6,7 @@ import Alert from 'components/Alert';
 import InfoModal from 'components/InfoModal';
 import SettingModal from 'components/SettingModal';
 import StatsModal from 'components/StatsModal';
+import WalletModal from 'components/WalletModal';
 import useLocalStorage from 'hooks/useLocalStorage';
 import useAlert from 'hooks/useAlert';
 import {
@@ -22,7 +23,6 @@ import {
 } from 'constants/settings';
 import styles from './App.module.scss';
 import 'styles/_transitionStyles.scss';
-import WalletModal from 'components/WalletModal';
 
 function App() {
   const [boardState, setBoardState] = useLocalStorage('boardState', {
@@ -98,9 +98,6 @@ function App() {
     if (isWalletModalOpen) document.body.setAttribute('data-wallet', 'open');
     else document.body.removeAttribute('data-wallet');
   }, [isWalletModalOpen]);
-
-
-  
 
   useEffect(() => {
     if (isDarkMode) document.body.setAttribute('data-theme', 'dark');
