@@ -19,19 +19,37 @@
   border-radius: 100px;
   position: relative;
   transition: background-color 0.2s;
+}
+/* Primary button style for actions in this modal */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border-radius: 10px;
+  border: none;
+  color: var(--color-text, #fff);
+  background: var(--color-primary, #4caf50);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
 
-  .button {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 24px;
-    height: 24px;
-    border-radius: 45px;
-    transition: 0.2s;
-    background: #fff;
-    box-shadow: 0 0 2px 0 rgba(10, 10, 10, 0.29);
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
   }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+/* Red variant (e.g., destructive/declined) */
+.buttonDeclined {
+  /* inherit base button layout via both classes */
+  background: var(--color-danger, #e53935);
 }
 
 .isOn {
@@ -60,15 +78,20 @@
 .content {
   background: var(--color-background, #111);
   color: var(--color-text, #fff);
+  display: flex;
+  flex-direction: column;
   width: 90%;
   max-width: 460px;
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  align-items: center;
 }
 
 .section {
   margin-top: 12px;
+  justify-content: center;
+  text-align: center;
 }
 
 .row {
@@ -76,4 +99,12 @@
   align-items: center;
   gap: 12px;
   margin: 8px 0;
+}
+
+/* Center the action area horizontally */
+.actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 12px;
 }

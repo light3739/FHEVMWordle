@@ -20,20 +20,6 @@ const WalletModal = ({
     return new Web3Modal({ cacheProvider: false, providerOptions: {} });
   }, []);
 
-  // Auto-connect when modal opens
-  useEffect(() => {
-    if (isOpen && !effectiveSession && !connecting) {
-      handleConnect();
-    }
-  }, [isOpen]);
-
-  // Close modal after successful connection
-  useEffect(() => {
-    if (effectiveSession && isOpen) {
-      setTimeout(() => onClose(), 1000);
-    }
-  }, [effectiveSession, isOpen]);
-
   const classes = classNames({
     [styles.modal]: true,
     [styles.isOpen]: isOpen,
@@ -98,11 +84,17 @@ const WalletModal = ({
                 <code>{effectiveSession.address}</code>
               </div>
             )}
-            <button onClick={handleDisconnect}>Disconnect</button>
+            <button
+              className={`${styles.button} ${styles.buttonDeclined}`}
+              onClick={handleDisconnect}
+            >
+              Disconnect
+            </button>
           </div>
         ) : (
-          <div className={styles.section}>
+          <div className={styles.actions}>
             <button
+              className={styles.button}
               onClick={handleConnect}
               disabled={isConnecting || connecting}
             >
