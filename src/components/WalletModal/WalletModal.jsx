@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import { useRef, useState } from 'react';
 import styles from './WalletModal.module.scss';
-import { providers } from 'ethers';
+import { BrowserProvider } from 'ethers';
 
 const WalletModal = ({
   isOpen,
@@ -32,7 +32,7 @@ const WalletModal = ({
     try {
       setConnecting(true);
       const provider = await universalConnector.connect();
-      const ethersProvider = new providers.Web3Provider(provider);
+      const ethersProvider = new BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
       const address = await signer.getAddress();
       const sess = { address, provider, signer };

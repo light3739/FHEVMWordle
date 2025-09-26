@@ -10,7 +10,7 @@ import WalletModal from 'components/WalletModal';
 import useLocalStorage from 'hooks/useLocalStorage';
 import useAlert from 'hooks/useAlert';
 import { getUniversalConnector } from 'hooks/useWallet';
-import { providers } from 'ethers';
+import { BrowserProvider } from 'ethers';
 
 import {
   solution,
@@ -111,7 +111,7 @@ function App() {
         if (!universalConnector.cachedProvider) return;
 
         const provider = await universalConnector.connect();
-        const ethersProvider = new providers.Web3Provider(provider);
+        const ethersProvider = new BrowserProvider(provider);
         const signer = await ethersProvider.getSigner();
         const address = await signer.getAddress();
         const { chainId } = await ethersProvider.getNetwork();
@@ -179,7 +179,7 @@ function App() {
     try {
       const provider = await (universalConnector.connect?.() ||
         Promise.reject(new Error('Connect not available')));
-      const ethersProvider = new providers.Web3Provider(provider);
+      const ethersProvider = new BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
       const address = await signer.getAddress();
       const { chainId } = await ethersProvider.getNetwork();
@@ -238,13 +238,8 @@ function App() {
       localStorage.removeItem('selectedNetwork');
       localStorage.removeItem('userAddress');
       localStorage.removeItem('userProfile');
-      // Если что-то храните в sessionStorage:
       sessionStorage.clear();
     } catch {}
-
-    // При желании — жесткая полная очистка всех ключей (осторожно!)
-    // localStorage.clear();
-
     setIsWalletModalOpen(false);
     showAlert('Wallet disconnected', 'success');
   };
