@@ -66,12 +66,21 @@ function App() {
   const [session, setSession] = useState();
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // Show welcome modal
+  // Show wallet modal on page load (only if not connected)
   useEffect(() => {
-    if (!boardState.solutionIndex)
-      setTimeout(() => setIsInfoModalOpen(true), 1000);
+    if (!session) {
+      setTimeout(() => setIsWalletModalOpen(true), 1000);
+    }
     // eslint-disable-next-line
-  }, []);
+  }, [session]);
+
+  // Show info modal after wallet connection
+  useEffect(() => {
+    if (session && !boardState.solutionIndex) {
+      setTimeout(() => setIsInfoModalOpen(true), 500);
+    }
+    // eslint-disable-next-line
+  }, [session]);
 
   // Initialize Universal Connector
   useEffect(() => {
@@ -229,6 +238,7 @@ function App() {
         setIsStatsModalOpen={setIsStatsModalOpen}
         setIsSettingsModalOpen={setIsSettingsModalOpen}
         setIsWalletModalOpen={setIsWalletModalOpen}
+        isWalletConnected={!!session}
       />
       <Alert />
       <Grid

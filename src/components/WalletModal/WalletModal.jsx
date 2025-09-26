@@ -1,5 +1,5 @@
 import classNames from 'classnames';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import styles from './WalletModal.module.scss';
 import Web3Modal from 'web3modal';
 import { ethers } from 'ethers';
@@ -19,6 +19,20 @@ const WalletModal = ({
   const web3Modal = useMemo(() => {
     return new Web3Modal({ cacheProvider: false, providerOptions: {} });
   }, []);
+
+  // Auto-connect when modal opens
+  useEffect(() => {
+    if (isOpen && !effectiveSession && !connecting) {
+      handleConnect();
+    }
+  }, [isOpen]);
+
+  // Close modal after successful connection
+  useEffect(() => {
+    if (effectiveSession && isOpen) {
+      setTimeout(() => onClose(), 1000);
+    }
+  }, [effectiveSession, isOpen]);
 
   const classes = classNames({
     [styles.modal]: true,

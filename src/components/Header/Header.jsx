@@ -1,4 +1,4 @@
-import { BsBarChart, BsGear, BsInfoCircle, BsWallet } from 'react-icons/bs';
+import { BsBarChart, BsGear, BsInfoCircle, BsWallet, BsWalletFill } from 'react-icons/bs';
 import './Header.module.scss';
 
 const Header = ({
@@ -6,6 +6,7 @@ const Header = ({
   setIsStatsModalOpen,
   setIsSettingsModalOpen,
   setIsWalletModalOpen,
+  isWalletConnected,
 }) => {
   return (
     <header>
@@ -23,7 +24,11 @@ const Header = ({
           <BsGear size="1.6rem" color="var(--color-icon)" />
         </button>
         <button onClick={() => setIsWalletModalOpen(true)}>
-          <BsWallet size="1.6rem" color="var(--color-icon)" />
+          {isWalletConnected ? (
+            <BsWalletFill size="1.6rem" color="var(--color-correct)" />
+          ) : (
+            <BsWallet size="1.6rem" color="var(--color-icon)" />
+          )}
         </button>
       </div>
     </header>
