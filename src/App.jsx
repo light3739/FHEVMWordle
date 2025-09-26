@@ -28,6 +28,7 @@ import styles from './App.module.scss';
 import 'styles/_transitionStyles.scss';
 
 function App() {
+  const [blockAutoReconnect, setBlockAutoReconnect] = useState(false);
   const [boardState, setBoardState] = useLocalStorage('boardState', {
     guesses: [],
     solutionIndex: '',
@@ -85,7 +86,7 @@ function App() {
     if (session && !boardState.solutionIndex) {
       setTimeout(() => setIsInfoModalOpen(true), 500);
     }
-  }, [session]);
+  }, [session, boardState.solutionIndex]);
 
   // Initialize Universal Connector
   useEffect(() => {
@@ -102,30 +103,29 @@ function App() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [showAlert]);
   useEffect(() => {
-    if (!universalConnector) return;
+    if (!universalConnector || blockAutoReconnect) return;
     (async () => {
       try {
-        // Если ранее выбранный провайдер закэширован – перезапускаем подключение
-        if (universalConnector.cachedProvider) {
-          const provider = await universalConnector.connect();
-          const ethersProvider = new providers.Web3Provider(provider);
-          const signer = await ethersProvider.getSigner();
-          const address = await signer.getAddress();
-          const { chainId } = await ethersProvider.getNetwork();
-          const newSession = { address, chainId };
-          setSession(newSession);
-          try {
-            localStorage.setItem('walletSession', JSON.stringify(newSession));
-          } catch {}
-        }
-      } catch (e) {
-        // Если автоподключение не удалось – показываем модалку выбора
+        if (!universalConnector.cachedProvider) return;
+
+        const provider = await universalConnector.connect();
+        const ethersProvider = new providers.Web3Provider(provider);
+        const signer = await ethersProvider.getSigner();
+        const address = await signer.getAddress();
+        const { chainId } = await ethersProvider.getNetwork();
+        const newSession = { address, chainId };
+
+        setSession(newSession);
+        try {
+          localStorage.setItem('walletSession', JSON.stringify(newSession));
+        } catch {}
+      } catch {
         setSession(undefined);
       }
     })();
-  }, [universalConnector]);
+  }, [universalConnector, blockAutoReconnect]);
 
   // Save boardState to localStorage
   useEffect(() => {
@@ -177,14 +177,23 @@ function App() {
     }
     setIsConnecting(true);
     try {
-      const result = await (universalConnector.connect?.() ||
+      const provider = await (universalConnector.connect?.() ||
         Promise.reject(new Error('Connect not available')));
-      const newSession = result?.session || result;
+      const ethersProvider = new providers.Web3Provider(provider);
+      const signer = await ethersProvider.getSigner();
+      const address = await signer.getAddress();
+      const { chainId } = await ethersProvider.getNetwork();
+      const newSession = { address, chainId };
+
       setSession(newSession);
       try {
         localStorage.setItem('walletSession', JSON.stringify(newSession));
+        localStorage.setItem('userAddress', address);
+        localStorage.setItem('selectedNetwork', String(chainId));
       } catch {}
+
       setIsWalletModalOpen(false);
+      setBlockAutoReconnect(false);
       showAlert('Wallet connected', 'success');
     } catch (e) {
       console.error('Connect failed', e);
@@ -195,15 +204,47 @@ function App() {
   };
 
   const handleDisconnectWallet = async () => {
+    // Блокируем автоподключение в этом цикле жизни
+    setBlockAutoReconnect(true);
+
     try {
+      // Разрываем соединение и чистим кэш провайдера в Web3Modal
       await universalConnector?.disconnect?.();
+      await universalConnector?.clearCachedProvider?.();
     } catch (e) {
       console.warn('Disconnect issue', e);
     }
+
+    // Чистим штатный ключ Web3Modal v1 (на всякий случай)
+    try {
+      localStorage.removeItem('WEB3_CONNECT_CACHED_PROVIDER');
+    } catch {}
+
+    // Чистим вашу сессию
     setSession(undefined);
     try {
       localStorage.removeItem('walletSession');
     } catch {}
+
+    // Очистка игрового ввода/состояния
+    setCurrentGuess('');
+    setGuesses([]);
+    setIsJiggling(false);
+    setIsGameWon(false);
+    setIsGameLost(false);
+    setBoardState({ guesses: [], solutionIndex });
+
+    try {
+      localStorage.removeItem('selectedNetwork');
+      localStorage.removeItem('userAddress');
+      localStorage.removeItem('userProfile');
+      // Если что-то храните в sessionStorage:
+      sessionStorage.clear();
+    } catch {}
+
+    // При желании — жесткая полная очистка всех ключей (осторожно!)
+    // localStorage.clear();
+
     setIsWalletModalOpen(false);
     showAlert('Wallet disconnected', 'success');
   };
