@@ -2,7 +2,7 @@ import classNames from 'classnames';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import styles from './WalletModal.module.scss';
 import Web3Modal from 'web3modal';
-import { ethers } from 'ethers';
+import { providers } from 'ethers';
 const WalletModal = ({
   isOpen,
   onClose,
@@ -48,7 +48,7 @@ const WalletModal = ({
     try {
       setConnecting(true);
       const provider = await web3Modal.connect();
-      const ethersProvider = new ethers.BrowserProvider(provider);
+      const ethersProvider = new providers.Web3Provider(provider);
       const signer = await ethersProvider.getSigner();
       const address = await signer.getAddress();
       const sess = { address, provider, signer };
