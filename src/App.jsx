@@ -10,6 +10,7 @@ import WalletModal from 'components/WalletModal';
 import useLocalStorage from 'hooks/useLocalStorage';
 import useAlert from 'hooks/useAlert';
 import { getUniversalConnector } from 'hooks/useWallet';
+import { providers } from 'ethers';
 
 import {
   solution,
@@ -63,23 +64,27 @@ function App() {
   const { showAlert } = useAlert();
   // Wallet state
   const [universalConnector, setUniversalConnector] = useState();
-  const [session, setSession] = useState();
+  const [session, setSession] = useState(() => {
+    try {
+      const stored = localStorage.getItem('walletSession');
+      return stored ? JSON.parse(stored) : undefined;
+    } catch {
+      return undefined;
+    }
+  });
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // Show wallet modal on page load (only if not connected)
+  // Open wallet modal if no session; close if session exists
   useEffect(() => {
-    if (!session) {
-      setTimeout(() => setIsWalletModalOpen(true), 1000);
-    }
-    // eslint-disable-next-line
-  }, [session]);
+    if (!session) setIsWalletModalOpen(true);
+    else setIsWalletModalOpen(false);
+  }, [session, boardState.solutionIndex]);
 
   // Show info modal after wallet connection
   useEffect(() => {
     if (session && !boardState.solutionIndex) {
       setTimeout(() => setIsInfoModalOpen(true), 500);
     }
-    // eslint-disable-next-line
   }, [session]);
 
   // Initialize Universal Connector
@@ -96,12 +101,31 @@ function App() {
     })();
     return () => {
       mounted = false;
-      try {
-        universalConnector?.removeAllListeners?.();
-      } catch {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    if (!universalConnector) return;
+    (async () => {
+      try {
+        // Если ранее выбранный провайдер закэширован – перезапускаем подключение
+        if (universalConnector.cachedProvider) {
+          const provider = await universalConnector.connect();
+          const ethersProvider = new providers.Web3Provider(provider);
+          const signer = await ethersProvider.getSigner();
+          const address = await signer.getAddress();
+          const { chainId } = await ethersProvider.getNetwork();
+          const newSession = { address, chainId };
+          setSession(newSession);
+          try {
+            localStorage.setItem('walletSession', JSON.stringify(newSession));
+          } catch {}
+        }
+      } catch (e) {
+        // Если автоподключение не удалось – показываем модалку выбора
+        setSession(undefined);
+      }
+    })();
+  }, [universalConnector]);
 
   // Save boardState to localStorage
   useEffect(() => {
@@ -157,6 +181,9 @@ function App() {
         Promise.reject(new Error('Connect not available')));
       const newSession = result?.session || result;
       setSession(newSession);
+      try {
+        localStorage.setItem('walletSession', JSON.stringify(newSession));
+      } catch {}
       setIsWalletModalOpen(false);
       showAlert('Wallet connected', 'success');
     } catch (e) {
@@ -174,6 +201,10 @@ function App() {
       console.warn('Disconnect issue', e);
     }
     setSession(undefined);
+    try {
+      localStorage.removeItem('walletSession');
+    } catch {}
+    setIsWalletModalOpen(false);
     showAlert('Wallet disconnected', 'success');
   };
 
@@ -281,6 +312,7 @@ function App() {
       <WalletModal
         isOpen={isWalletModalOpen}
         onClose={() => setIsWalletModalOpen(false)}
+        universalConnector={universalConnector}
         isConnecting={isConnecting}
         session={session}
         onConnect={handleConnectWallet}
