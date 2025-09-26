@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import { useRef, useState } from 'react';
 import styles from './WalletModal.module.scss';
-import { BrowserProvider } from 'ethers';
+// import { BrowserProvider } from 'ethers'; // больше не нужен
 
 const WalletModal = ({
   isOpen,
@@ -13,35 +13,14 @@ const WalletModal = ({
   onDisconnect,
 }) => {
   const ref = useRef();
-  const [connecting, setConnecting] = useState(false);
 
   const classes = classNames({
     [styles.modal]: true,
     [styles.isOpen]: isOpen,
   });
-
+  const [connecting] = useState(false);
   const stop = e => {
     e.stopPropagation();
-  };
-
-  const handleConnect = async () => {
-    if (!universalConnector) {
-      alert('Wallet not ready');
-      return;
-    }
-    try {
-      setConnecting(true);
-      const provider = await universalConnector.connect();
-      const ethersProvider = new BrowserProvider(provider);
-      const signer = await ethersProvider.getSigner();
-      const address = await signer.getAddress();
-      const sess = { address, provider, signer };
-      if (onConnect) onConnect(sess);
-    } catch (e) {
-      // silently ignore cancel or handle error
-    } finally {
-      setConnecting(false);
-    }
   };
 
   const handleDisconnect = async () => {
@@ -85,13 +64,13 @@ const WalletModal = ({
             </button>
           </div>
         ) : (
-          <div className={styles.actions}>
+          <div className={styles.section}>
             <button
               className={styles.button}
-              onClick={handleConnect}
-              disabled={isConnecting || connecting || !universalConnector}
+              onClick={onConnect}
+              disabled={connecting || !universalConnector}
             >
-              {isConnecting || connecting ? 'Connecting…' : 'Connect Wallet'}
+              {connecting ? 'Connecting...' : 'Connect'}
             </button>
           </div>
         )}

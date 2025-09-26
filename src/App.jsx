@@ -63,6 +63,43 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(theme === 'dark');
   const [isHighContrastMode, setIsHighContrastMode] = useState(highContrast);
   const { showAlert } = useAlert();
+  // Ensure Sepolia network (chainId 11155111)
+  const ensureSepolia = async provider => {
+    const targetHex = '0xaa36a7';
+    try {
+      await provider.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: targetHex }],
+      });
+    } catch (err) {
+      if (err?.code === 4902) {
+        await provider.request({
+          method: 'wallet_addEthereumChain',
+          params: [
+            {
+              chainId: targetHex,
+              chainName: 'Sepolia',
+              rpcUrls: [
+                'https://sepolia.infura.io/v3/17d9c7c455364415a1d9186f7774517e',
+              ],
+              nativeCurrency: {
+                name: 'SepoliaETH',
+                symbol: 'ETH',
+                decimals: 18,
+              },
+              blockExplorerUrls: ['https://sepolia.etherscan.io'],
+            },
+          ],
+        });
+        await provider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: targetHex }],
+        });
+      } else {
+        throw err;
+      }
+    }
+  };
   // Wallet state
   const [universalConnector, setUniversalConnector] = useState();
   const [session, setSession] = useState(() => {
@@ -179,12 +216,21 @@ function App() {
     try {
       const provider = await (universalConnector.connect?.() ||
         Promise.reject(new Error('Connect not available')));
+
+      // 1) Принудительный свитч сети на Sepolia
+      await ensureSepolia(provider);
+
+      // 2) Оборачиваем в ethers v6
       const ethersProvider = new BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
       const address = await signer.getAddress();
       const { chainId } = await ethersProvider.getNetwork();
-      const newSession = { address, chainId };
+      if (chainId !== 11155111) {
+        showAlert('Please switch to Sepolia network in your wallet', 'warning');
+      }
 
+      // Сохраняем сессию независимо от сети
+      const newSession = { address, chainId };
       setSession(newSession);
       try {
         localStorage.setItem('walletSession', JSON.stringify(newSession));

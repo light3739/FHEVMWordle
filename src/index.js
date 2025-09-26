@@ -5,11 +5,9 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 
 ReactDOM.render(
-  <React.StrictMode>
-    <AlertProvider>
-      <App />
-    </AlertProvider>
-  </React.StrictMode>,
+  <AlertProvider>
+    <App />
+  </AlertProvider>,
   document.getElementById('root')
 );
 
