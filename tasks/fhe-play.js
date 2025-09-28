@@ -7,7 +7,7 @@ function charToNum(c) {
   const code = c.toUpperCase().charCodeAt(0);
   if (code < 65 || code > 90) throw new Error(`Invalid char: ${c}`);
   return code - 64;
-} // A=1..Z=26
+}
 function wordToNums(w) {
   if (w.length !== 5) throw new Error(`Word must be 5 letters: ${w}`);
   return Array.from(w).map(charToNum);
@@ -27,72 +27,196 @@ function allGreen(results) {
   return results.every(x => Number(x) === 3);
 }
 
-// Safe EIP-1559 fees
+// Minimal EIP-1559 boost
 async function getFeeOverrides(
   provider,
-  { prioGwei = 3n, minBaseGwei = 10n, maxMultiplier = 150n } = {}
+  { extraPrioGwei = 1n, maxFeeHeadroomPct = 10n } = {}
 ) {
   const fd = await provider.getFeeData();
-  const base =
-    fd.maxFeePerGas ?? ethers.parseUnits(minBaseGwei.toString(), 'gwei');
   const prio = fd.maxPriorityFeePerGas ?? ethers.parseUnits('1', 'gwei');
-  const bumpPrio = prio + ethers.parseUnits(prioGwei.toString(), 'gwei');
-  const candidate = base + bumpPrio;
-  const minMax = (base * maxMultiplier) / 100n;
-  const finalMax = candidate > minMax ? candidate : minMax;
+  const baseMax = fd.maxFeePerGas ?? prio * 2n;
+  const bumpPrio = prio + ethers.parseUnits(extraPrioGwei.toString(), 'gwei');
+  const headroom = (baseMax * (100n + maxFeeHeadroomPct)) / 100n;
+  const finalMax =
+    headroom > bumpPrio ? headroom : bumpPrio + ethers.parseUnits('1', 'gwei');
   return { maxPriorityFeePerGas: bumpPrio, maxFeePerGas: finalMax };
 }
 
-task('fhe:play', 'Play Wordle over FHE on Sepolia (robust)')
+// Анализ событий в транзакции
+async function analyzeTransaction(provider, txHash, contract) {
+  try {
+    const receipt = await provider.getTransactionReceipt(txHash);
+    console.log(
+      `📋 Receipt status: ${receipt.status}, gasUsed: ${receipt.gasUsed}`
+    );
+    console.log(`📋 Logs count: ${receipt.logs.length}`);
+
+    // Декодируем события
+    for (const log of receipt.logs) {
+      try {
+        const parsed = contract.interface.parseLog(log);
+        if (parsed) {
+          console.log(`📝 Event: ${parsed.name}`, parsed.args.map(String));
+        }
+      } catch (e) {
+        // Не наш контракт или неизвестное событие
+      }
+    }
+
+    // Пробуем replay для получения revert reason
+    if (receipt.status === 0n) {
+      try {
+        const tx = await provider.getTransaction(txHash);
+        await provider.call(
+          {
+            to: tx.to,
+            from: tx.from,
+            data: tx.data,
+            gasLimit: tx.gasLimit,
+            value: tx.value || 0,
+          },
+          receipt.blockNumber
+        );
+      } catch (error) {
+        if (error.reason) {
+          console.log(`📋 Revert reason: ${error.reason}`);
+        } else if (error.data && error.data.startsWith('0x08c379a0')) {
+          try {
+            const reason = ethers.AbiCoder.defaultAbiCoder().decode(
+              ['string'],
+              '0x' + error.data.slice(10)
+            );
+            console.log(`📋 Revert reason: ${reason[0]}`);
+          } catch (e) {
+            console.log(`📋 Raw revert data: ${error.data}`);
+          }
+        } else {
+          console.log(
+            `📋 Unknown revert:`,
+            error.shortMessage || error.message
+          );
+        }
+      }
+    }
+  } catch (e) {
+    console.log(`📋 Analysis failed:`, e.message);
+  }
+}
+
+// Толерантная отправка
+async function sendFunctionTolerant({
+  wallet,
+  contract,
+  func,
+  args = [],
+  provider,
+  gasLimit,
+}) {
+  const fees = await getFeeOverrides(provider);
+
+  let gas;
+  try {
+    gas = await contract[func].estimateGas(...args, { ...fees });
+  } catch (e) {
+    console.log(`⚠️ Gas estimation failed for ${func}:`, e?.shortMessage);
+    gas = gasLimit ?? 2_000_000n;
+  }
+  const finalGas =
+    gasLimit ?? (typeof gas === 'bigint' ? (gas * 130n) / 100n : 2_200_000n);
+
+  try {
+    const tx = await contract[func](...args, { ...fees, gasLimit: finalGas });
+    console.log(`📤 Sent ${func} tx:`, tx.hash);
+
+    const r = await tx.wait();
+    console.log(
+      `📥 ${func} mined, block: ${r.blockNumber}, gasUsed: ${r.gasUsed}`
+    );
+
+    // Анализируем транзакцию независимо от статуса
+    await analyzeTransaction(provider, r.hash, contract);
+
+    if (r.status !== 1n) {
+      console.log(`⚠️ ${func} reverted but may have partial effect`);
+      return { success: false, receipt: r };
+    }
+
+    return { success: true, receipt: r };
+  } catch (e) {
+    console.error(`❌ ${func} failed:`, e?.shortMessage || e?.message);
+    throw e;
+  }
+}
+
+task('fhe:play', 'Play Wordle with fault tolerance and auto-restart')
   .addParam('address', 'Contract address')
   .addParam('words', 'Comma-separated 5-letter words, e.g. HELLO,WORLD,TABLE')
   .setAction(async ({ address, words }, hre) => {
-    // Provider v6 pinned to Sepolia
     const req = new ethers.FetchRequest(hre.network.config.url);
     req.timeout = 300_000;
     const provider = new ethers.JsonRpcProvider(req, 11155111);
     const net = await provider.getNetwork();
     console.log('🌐 Network:', net.name, Number(net.chainId));
-    if (Number(net.chainId) !== 11155111) throw new Error('Run on Sepolia');
 
-    // Signer
     const pk = process.env.PRIVATE_KEY;
     if (!pk) throw new Error('Set PRIVATE_KEY');
     const wallet = new ethers.Wallet(pk, provider);
+    const me = await wallet.getAddress();
+    console.log('👤 Player:', me);
 
-    // Contract
     const art = await hre.artifacts.readArtifact('FHEVMWordleFHE_Fixed');
     const c = new ethers.Contract(address, art.abi, wallet);
-    const me = await wallet.getAddress();
 
-    // Ensure production FHE mode
-    if (await c.testMode()) {
-      const fees0 = await getFeeOverrides(provider);
-      const tx0 = await c.setTestMode(false, fees0);
-      await tx0.wait();
-    }
-
-    // Continue or start new game
     const wallStart = Date.now();
     let g = await c.games(me);
-    if (Number(g.status) === 0 || Number(g.status) > 1) {
+
+    console.log(
+      `📊 Game state: status=${Number(g.status)}, attempt=${Number(
+        g.currentAttempt
+      )}, pending=${g.pendingRequestId.toString()}`
+    );
+
+    // 🎮 АВТОМАТИЧЕСКИЙ СТАРТ НОВОЙ ИГРЫ
+    const needNewGame = Number(g.status) === 0 || Number(g.status) > 1; // NotStarted, Won, Lost
+
+    if (needNewGame) {
+      console.log(`🎮 Starting new game (current status: ${Number(g.status)})`);
       const sessionHash = ethers.keccak256(
-        ethers.toUtf8Bytes(`session-${wallStart}`)
+        ethers.toUtf8Bytes(`session-${wallStart}-${Math.random()}`)
       );
-      const feesS = await getFeeOverrides(provider);
-      const txS = await c.startGame(sessionHash, feesS);
-      await txS.wait();
-      console.log('🎮 Game started');
-      g = await c.games(me);
+
+      try {
+        const startResult = await sendFunctionTolerant({
+          wallet,
+          contract: c,
+          func: 'startGame',
+          args: [sessionHash],
+          provider,
+          gasLimit: 1_000_000n,
+        });
+
+        if (startResult.success) {
+          console.log('✅ New game started successfully');
+        } else {
+          console.log('⚠️ startGame reverted but may have worked');
+        }
+
+        // Обновляем состояние игры после старта
+        g = await c.games(me);
+        console.log(
+          `📊 After start: status=${Number(g.status)}, attempt=${Number(
+            g.currentAttempt
+          )}`
+        );
+      } catch (e) {
+        console.error('❌ Failed to start new game:', e.message);
+        // Пробуем продолжить с текущим состоянием
+      }
     } else {
-      console.log(
-        `🔄 Continuing game: attempt ${Number(
-          g.currentAttempt
-        )}/6, pending ${g.pendingRequestId.toString()}`
-      );
+      console.log(`🔄 Continuing existing game`);
     }
 
-    // Helper: wait event GuessEvaluated for attempt idx
+    // Wait GuessEvaluated
     async function waitGuessEvaluated(idx) {
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
@@ -100,164 +224,189 @@ task('fhe:play', 'Play Wordle over FHE on Sepolia (robust)')
           reject(new Error('Timeout waiting GuessEvaluated'));
         }, 180_000);
         const handler = (player, attempt, results) => {
+          console.log(
+            `📡 GuessEvaluated: player=${player}, attempt=${attempt}, results=[${results
+              .map(Number)
+              .join(',')}]`
+          );
           if (String(player).toLowerCase() !== me.toLowerCase()) return;
           if (Number(attempt) !== idx) return;
           c.removeListener('GuessEvaluated', handler);
           clearTimeout(timeout);
-          resolve(results.map(x => Number(x)));
+          resolve(results.map(Number));
         };
         c.on('GuessEvaluated', handler);
       });
     }
 
     const guesses = words.split(',').map(w => w.trim().toUpperCase());
+    console.log('📝 Words to guess:', guesses.join(', '));
 
-    // Main loop
-    for (;;) {
+    // Main game loop с толерантностью к ревёртам
+    let attemptIndex = Number(g.currentAttempt);
+
+    while (attemptIndex < Math.min(6, guesses.length)) {
+      // Обновляем состояние игры
       g = await c.games(me);
+      console.log(
+        `🔄 Loop: attempt=${Number(g.currentAttempt)}, status=${Number(
+          g.status
+        )}, pending=${g.pendingRequestId.toString()}`
+      );
+
       if (Number(g.status) !== 1) {
-        // not InProgress
+        const statusMsg =
+          Number(g.status) === 2
+            ? 'Won'
+            : Number(g.status) === 3
+            ? 'Lost'
+            : 'NotStarted';
         console.log(
-          `✅ Done. Status: ${Number(
-            g.status
-          )} (2=Won,3=Lost), attempt: ${Number(
-            g.currentAttempt
-          )}, pending: ${g.pendingRequestId.toString()}`
+          `✅ Game ended with status: ${Number(g.status)} (${statusMsg})`
         );
-        break;
-      }
-      const i = Number(g.currentAttempt);
-      if (i >= 6 || i >= guesses.length) {
-        console.log(
-          `🛑 No more guesses to play (i=${i}, provided=${guesses.length})`
-        );
-        break;
+
+        // 🎮 АВТОМАТИЧЕСКИЙ РЕСТАРТ ПРИ ЗАВЕРШЕНИИ ИГРЫ
+        if (Number(g.status) > 1) {
+          // Won или Lost
+          console.log(`🔄 Auto-restarting new game...`);
+          const newSessionHash = ethers.keccak256(
+            ethers.toUtf8Bytes(`restart-${Date.now()}-${Math.random()}`)
+          );
+
+          try {
+            await sendFunctionTolerant({
+              wallet,
+              contract: c,
+              func: 'startGame',
+              args: [newSessionHash],
+              provider,
+              gasLimit: 1_000_000n,
+            });
+
+            console.log('✅ New game auto-started');
+            g = await c.games(me);
+            attemptIndex = Number(g.currentAttempt); // Reset attempt index
+            continue; // Продолжаем с новой игрой
+          } catch (e) {
+            console.error('❌ Auto-restart failed:', e.message);
+            break;
+          }
+        } else {
+          break; // NotStarted - выходим
+        }
       }
 
-      // Enforce no pending decrypt
       if (Number(g.pendingRequestId) !== 0) {
         console.log(
-          `⏳ Pending decrypt ${g.pendingRequestId.toString()} still in progress; waiting 5s…`
+          `⏳ Pending decrypt ${g.pendingRequestId.toString()}, waiting...`
         );
         await new Promise(r => setTimeout(r, 5000));
         continue;
       }
 
-      const word = guesses[i];
+      // Синхронизируем наш индекс с контрактом
+      const contractAttempt = Number(g.currentAttempt);
+      if (attemptIndex < contractAttempt) {
+        console.log(
+          `🔁 Syncing: our=${attemptIndex}, contract=${contractAttempt}`
+        );
+        attemptIndex = contractAttempt;
+      }
+
+      if (attemptIndex >= guesses.length) {
+        console.log(`🛑 No more words for attempt ${attemptIndex}`);
+        break;
+      }
+
+      const word = guesses[attemptIndex];
       const arr = wordToNums(word);
+      console.log(
+        `🎯 Attempt ${attemptIndex + 1}: ${word} -> [${arr.join(',')}]`
+      );
 
-      // Preflight via callStatic to detect require-fail early
-      try {
-        await c.submitGuess.staticCall(arr); // no state change, checks revertability
-      } catch (e) {
-        console.error(
-          `❌ submitGuess would revert at attempt ${i + 1}:`,
-          e?.shortMessage || e?.message || e
-        );
-        // Minor backoff and re-check state; if still blocked, stop
-        await new Promise(r => setTimeout(r, 3000));
-        const g2 = await c.games(me);
-        console.log(
-          `📊 State — status: ${Number(g2.status)}, attempt: ${Number(
-            g2.currentAttempt
-          )}, pending: ${g2.pendingRequestId.toString()}`
-        );
+      // submitGuess с толерантностью
+      const submitResult = await sendFunctionTolerant({
+        wallet,
+        contract: c,
+        func: 'submitGuess',
+        args: [arr],
+        provider,
+        gasLimit: 2_200_000n,
+      });
+
+      // Проверяем состояние после submit
+      const gAfterSubmit = await c.games(me);
+      console.log(
+        `📊 After submit: attempt=${Number(
+          gAfterSubmit.currentAttempt
+        )}, pending=${gAfterSubmit.pendingRequestId.toString()}, status=${Number(
+          gAfterSubmit.status
+        )}`
+      );
+
+      // Если attempt увеличился, значит submit сработал
+      if (Number(gAfterSubmit.currentAttempt) > attemptIndex) {
+        console.log(`✅ Submit had effect despite revert`);
+        attemptIndex = Number(gAfterSubmit.currentAttempt);
+      } else if (!submitResult.success) {
+        console.log(`❌ Submit failed and no state change`);
+        break;
+      }
+
+      // requestDecryptResults если нет pending
+      if (Number(gAfterSubmit.pendingRequestId) === 0) {
+        console.log('🔐 Requesting decryption...');
+
+        const decryptResult = await sendFunctionTolerant({
+          wallet,
+          contract: c,
+          func: 'requestDecryptResults',
+          args: [],
+          provider,
+          gasLimit: 800_000n,
+        });
+
         if (
-          Number(g2.status) !== 1 ||
-          Number(g2.currentAttempt) !== i ||
-          Number(g2.pendingRequestId) !== 0
-        )
-          continue;
-        // as last resort we can try sending with explicit gasLimit, but if it truly reverts it will still fail
-      }
+          decryptResult.success ||
+          Number((await c.games(me)).pendingRequestId) !== 0
+        ) {
+          const reqId = await c.latestRequestId();
+          console.log(`🔍 Waiting for decrypt of request ${reqId}...`);
 
-      // Submit with safe fees and optional gasLimit fallback
-      const feesG = await getFeeOverrides(provider);
-      let txG;
-      try {
-        txG = await c.submitGuess(arr, { ...feesG }); // let node estimate gas
-        await txG.wait();
-      } catch (e) {
-        console.error(
-          `⚠️ submitGuess estimate/send error at attempt ${i + 1}:`,
-          e?.shortMessage || e?.message || e
-        );
-        // Try with conservative gasLimit to bypass estimateGas failure paths
-        try {
-          txG = await c.submitGuess(arr, { ...feesG, gasLimit: 2_000_000 });
-          await txG.wait();
-        } catch (e2) {
-          console.error(
-            `❌ submitGuess hard-failed at attempt ${i + 1}:`,
-            e2?.shortMessage || e2?.message || e2
-          );
-          break;
+          try {
+            const t0 = Date.now();
+            const res = await waitGuessEvaluated(attemptIndex - 1);
+            const dt = Date.now() - t0;
+
+            console.log(
+              `📝 Result ${attemptIndex}: ${paintRow(word, res)}  ⏱ ${dt} ms`
+            );
+
+            if (allGreen(res)) {
+              const total = Date.now() - wallStart;
+              console.log(`🏆 Win! ⏱ total ${total} ms`);
+              // Не break - позволяем циклу автоматически стартовать новую игру
+            }
+          } catch (e) {
+            console.log('⏰ Decrypt timeout:', e.message);
+          }
+        } else {
+          console.log('❌ Decrypt request failed');
         }
-      }
-
-      // Re-read state and ensure no pending before requesting decrypt
-      let gBefore = await c.games(me);
-      if (Number(gBefore.pendingRequestId) !== 0) {
+      } else {
         console.log(
-          `⏳ Pending became ${gBefore.pendingRequestId.toString()} after submit; waiting…`
+          `⏳ Already pending: ${gAfterSubmit.pendingRequestId.toString()}`
         );
         await new Promise(r => setTimeout(r, 3000));
-        gBefore = await c.games(me);
-      }
-      if (Number(gBefore.pendingRequestId) !== 0) {
-        // If contract auto-triggers request inside submit (unlikely), just wait for event
-      } else {
-        const t0 = Date.now();
-        const feesR = await getFeeOverrides(provider);
-        let txR;
-        try {
-          txR = await c.requestDecryptResults({ ...feesR });
-          await txR.wait();
-        } catch (e) {
-          console.error(
-            `⚠️ requestDecryptResults error:`,
-            e?.shortMessage || e?.message || e
-          );
-          // Retry once with gasLimit if estimateGas failed
-          try {
-            txR = await c.requestDecryptResults({
-              ...feesR,
-              gasLimit: 800_000,
-            });
-            await txR.wait();
-          } catch (e2) {
-            console.error(
-              `❌ requestDecryptResults hard-failed:`,
-              e2?.shortMessage || e2?.message || e2
-            );
-            break;
-          }
-        }
-
-        const reqId = await c.latestRequestId();
-        let res;
-        try {
-          res = await waitGuessEvaluated(i);
-        } catch (e) {
-          console.error('⛔ waitGuessEvaluated timeout:', e?.message || e);
-          // passive retry once
-          await new Promise(r => setTimeout(r, 5000));
-          res = await waitGuessEvaluated(i);
-        }
-        const dt = Date.now() - t0;
-        console.log(
-          `📝 Attempt ${i + 1}: ${paintRow(
-            word,
-            res
-          )}  ⏱ decrypt ${dt} ms  (requestId ${reqId})`
-        );
-        if (allGreen(res)) {
-          const total = Date.now() - wallStart;
-          console.log(`🏆 Win! ⏱ total ${total} ms`);
-          break;
-        }
       }
     }
+
+    const finalGame = await c.games(me);
+    console.log(
+      `🏁 Final: status=${Number(finalGame.status)}, attempt=${Number(
+        finalGame.currentAttempt
+      )}`
+    );
   });
 
 module.exports = {};

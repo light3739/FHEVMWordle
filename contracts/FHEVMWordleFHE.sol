@@ -1,8 +1,8 @@
-    // SPDX-License-Identifier: MIT
-    pragma solidity ^0.8.24;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
 
-    import { FHE, euint8, ebool } from "@fhevm/solidity/lib/FHE.sol";
-    import { SepoliaConfig } from "@fhevm/solidity/config/ZamaConfig.sol";
+import { FHE, euint8, ebool } from "@fhevm/solidity/lib/FHE.sol";
+import { SepoliaConfig } from "@fhevm/solidity/config/ZamaConfig.sol";
 
     contract FHEVMWordleFHE_Fixed is SepoliaConfig {
         using FHE for euint8;
