@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import TutorialCard from 'components/TutorialCard';
+import TutorialCard from '../TutorialCard';
 import styles from './InteractiveTutorial.module.scss';
 
 const InteractiveTutorial = () => {
