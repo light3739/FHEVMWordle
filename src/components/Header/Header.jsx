@@ -7,15 +7,23 @@ const Header = ({
   setIsSettingsModalOpen,
   setIsWalletModalOpen,
   isWalletConnected,
+  progressInfo,
 }) => {
   return (
     <header>
-      <div>
+      <div className="left-section">
+        {progressInfo && (
+          <div className="progress-info">
+            <span className="progress-text">{progressInfo}</span>
+          </div>
+        )}
         <button onClick={() => setIsInfoModalOpen(true)}>
           <BsInfoCircle size="1.6rem" color="var(--color-icon)" />
         </button>
       </div>
-      <h1>WORDLE</h1>
+      <div className="title-container">
+        <h1>WORDLE/ZAMA</h1>
+      </div>
       <div>
         <button onClick={() => setIsStatsModalOpen(true)}>
           <BsBarChart size="1.6rem" color="var(--color-icon)" />
