@@ -7,6 +7,8 @@ import InfoModal from 'components/InfoModal';
 import SettingModal from 'components/SettingModal';
 import StatsModal from 'components/StatsModal';
 import WalletModal from 'components/WalletModal';
+import TutorialToggle from 'components/TutorialToggle';
+import TutorialMode from 'components/TutorialMode';
 import useLocalStorage from 'hooks/useLocalStorage';
 import useAlert from 'hooks/useAlert';
 import { getUniversalConnector } from 'hooks/useWallet';
@@ -62,6 +64,7 @@ function App() {
   const [isHardMode, setIsHardMode] = useState(hardMode);
   const [isDarkMode, setIsDarkMode] = useState(theme === 'dark');
   const [isHighContrastMode, setIsHighContrastMode] = useState(highContrast);
+  const [isTutorialMode, setIsTutorialMode] = useState(true); // Начинаем с туториала
   const { showAlert } = useAlert();
   // Ensure Sepolia network (chainId 11155111)
   const ensureSepolia = async provider => {
@@ -305,6 +308,10 @@ function App() {
     setHardMode(!isHardMode);
   };
 
+  const handleTutorialToggle = () => {
+    setIsTutorialMode(!isTutorialMode);
+  };
+
   const handleKeyDown = letter =>
     currentGuess.length < MAX_WORD_LENGTH &&
     !isGameWon &&
@@ -353,19 +360,30 @@ function App() {
         setIsWalletModalOpen={setIsWalletModalOpen}
         isWalletConnected={!!session}
       />
+      <TutorialToggle 
+        isTutorialMode={isTutorialMode}
+        onToggle={handleTutorialToggle}
+      />
       <Alert />
-      <Grid
-        currentGuess={currentGuess}
-        guesses={guesses}
-        isJiggling={isJiggling}
-        setIsJiggling={setIsJiggling}
-      />
-      <Keyboard
-        onEnter={handleEnter}
-        onDelete={handleDelete}
-        onKeyDown={handleKeyDown}
-        guesses={guesses}
-      />
+      
+      {isTutorialMode ? (
+        <TutorialMode />
+      ) : (
+        <>
+          <Grid
+            currentGuess={currentGuess}
+            guesses={guesses}
+            isJiggling={isJiggling}
+            setIsJiggling={setIsJiggling}
+          />
+          <Keyboard
+            onEnter={handleEnter}
+            onDelete={handleDelete}
+            onKeyDown={handleKeyDown}
+            guesses={guesses}
+          />
+        </>
+      )}
       <InfoModal
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}

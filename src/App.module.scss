@@ -9,7 +9,7 @@
 
 :root {
   --color-absent: #405069;
-  --color-present: #e0c02b;
+  --color-present: rgb(247, 211, 75);
   --color-correct: #31ad23;
   --color-alert-success: #3fbf62;
   --color-alert-error: #ea4e2c;
@@ -53,11 +53,10 @@ body {
 }
 
 .container {
-  height: 100vh;
+  min-height: 100vh;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0.5rem;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
 }

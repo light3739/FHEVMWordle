@@ -1,0 +1,92 @@
+.toggleContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 0 20px;
+}
+
+.labels {
+  display: flex;
+  gap: 40px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.active {
+  color: var(--color-text-primary) !important;
+  font-weight: 700;
+}
+
+.inactive {
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+}
+
+.toggle {
+  position: relative;
+  width: 120px;
+  height: 50px;
+  background: var(--color-key);
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid var(--color-cell);
+  
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.tutorialMode {
+  .knob {
+    transform: translateX(0px); // Слева для туториала
+  }
+}
+
+// Стиль для игрового режима (когда tutorialMode класс НЕ активен)
+.toggle:not(.tutorialMode) {
+  .knob {
+    transform: translateX(70px); // Справа для игры
+  }
+}
+
+.slider {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 25px;
+  overflow: hidden;
+}
+
+.knob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 38px;
+  height: 38px;
+  background: var(--color-background);
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    background: var(--color-text-primary);
+    border-radius: 50%;
+  }
+}
+
+
+// Анимация при переключении
+.toggle:active .knob {
+  transform: scale(0.95);
+}
