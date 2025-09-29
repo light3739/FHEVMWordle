@@ -1,0 +1,133 @@
+.startGameContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  padding: 2rem;
+}
+
+.startGameContent {
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.description {
+  font-size: 1.1rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 2rem;
+  line-height: 1.4;
+}
+
+.buttonsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.startButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 32px;
+  border-radius: 12px;
+  border: none;
+  color: #fff;
+  background: var(--color-correct, #31ad23);
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(49, 173, 35, 0.3);
+
+  &:hover:not(:disabled) {
+    background: #2a9a1f;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(49, 173, 35, 0.4);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(49, 173, 35, 0.3);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 4px 12px rgba(49, 173, 35, 0.2);
+  }
+}
+
+.continueButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 32px;
+  border-radius: 12px;
+  border: 2px solid var(--color-present, #c9b458);
+  color: var(--color-present, #c9b458);
+  background: transparent;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 180px;
+
+  &:hover:not(:disabled) {
+    background: var(--color-present, #c9b458);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(201, 180, 88, 0.3);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+.gameInfo {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+@media screen and (max-width: 480px) {
+  .startGameContainer {
+    padding: 1rem;
+    min-height: 50vh;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+
+  .description {
+    font-size: 1rem;
+  }
+
+  .startButton {
+    padding: 14px 28px;
+    font-size: 1.1rem;
+    min-width: 160px;
+  }
+}

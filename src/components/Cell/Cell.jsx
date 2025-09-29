@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import styles from './Cell.module.scss';
 
-const Cell = ({ value, status, position, isCompleted }) => {
+const Cell = ({ value, status, position, isCompleted, isSubmitting }) => {
   const classes = classNames({
     [styles.cell]: true,
     [styles.absent]: status === 'absent',
@@ -9,6 +9,7 @@ const Cell = ({ value, status, position, isCompleted }) => {
     [styles.correct]: status === 'correct',
     [styles.fill]: value,
     [styles.reveal]: isCompleted,
+    [styles.submitting]: isSubmitting,
   });
 
   const animationDelay = `${position * 0.35}s`;

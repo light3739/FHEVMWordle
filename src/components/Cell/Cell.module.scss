@@ -17,6 +17,20 @@
   animation-duration: 0.2s;
 }
 
+.submitting {
+  opacity: 0.6;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
 .reveal {
   animation-duration: 0.3s;
   animation-timing-function: linear;

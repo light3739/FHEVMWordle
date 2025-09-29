@@ -3,11 +3,41 @@ import classNames from 'classnames';
 import { getStatuses } from 'lib/words';
 import styles from './Keyboard.module.scss';
 
-const Keyboard = ({ onEnter, onDelete, onKeyDown, guesses }) => {
-  const charStatuses = getStatuses(guesses);
+const getStatusesFromContract = (guesses, contractResults) => {
+  const charObj = {};
+  
+  guesses.forEach((word, guessIndex) => {
+    const statuses = contractResults[guessIndex];
+    if (statuses) {
+      // Используем результаты от контракта
+      word.split('').forEach((letter, i) => {
+        const currentStatus = charObj[letter.toUpperCase()];
+        const newStatus = statuses[i];
+        
+        // Приоритет: correct > present > absent
+        if (newStatus === 'correct' || 
+           (newStatus === 'present' && currentStatus !== 'correct') ||
+           (newStatus === 'absent' && !currentStatus)) {
+          charObj[letter.toUpperCase()] = newStatus;
+        }
+      });
+    } else {
+      // Fallback к локальной логике если результатов от контракта нет
+      return getStatuses(guesses);
+    }
+  });
+  
+  return charObj;
+};
+
+const Keyboard = ({ onEnter, onDelete, onKeyDown, guesses, isSubmittingWord, contractResults }) => {
+  // Создаем статусы клавиш на основе результатов от контракта
+  const charStatuses = getStatusesFromContract(guesses, contractResults);
 
   useEffect(() => {
     const listener = e => {
+      if (isSubmittingWord) return; // Блокируем ввод во время отправки
+      
       const key = e.key.toUpperCase();
       if (key === 'BACKSPACE') return onDelete();
       if (key === 'ENTER') return onEnter();
@@ -18,9 +48,11 @@ const Keyboard = ({ onEnter, onDelete, onKeyDown, guesses }) => {
     return () => {
       window.removeEventListener('keydown', listener);
     };
-  });
+  }, [isSubmittingWord, onDelete, onEnter, onKeyDown]);
 
   const handleClick = key => {
+    if (isSubmittingWord) return; // Блокируем клики во время отправки
+    
     if (key === 'ENTER') return onEnter();
     if (key === 'DELETE') return onDelete();
 
@@ -28,7 +60,7 @@ const Keyboard = ({ onEnter, onDelete, onKeyDown, guesses }) => {
   };
 
   return (
-    <div className={styles.keyboard}>
+    <div className={classNames(styles.keyboard, { [styles.submitting]: isSubmittingWord })}>
       <div className={styles.row}>
         {['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(char => (
           <Key

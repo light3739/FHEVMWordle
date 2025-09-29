@@ -18,6 +18,11 @@
   animation-duration: 0.3s;
 }
 
+.submitting {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 @keyframes jiggle {
   0% {
     transform: translate(0, 0);
