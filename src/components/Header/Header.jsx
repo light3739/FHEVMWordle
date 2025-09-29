@@ -1,4 +1,10 @@
-import { BsBarChart, BsGear, BsInfoCircle, BsWallet, BsWalletFill } from 'react-icons/bs';
+import {
+  BsBarChart,
+  BsGear,
+  BsInfoCircle,
+  BsWallet,
+  BsWalletFill,
+} from 'react-icons/bs';
 import './Header.module.scss';
 
 const Header = ({
@@ -21,7 +27,7 @@ const Header = ({
           <BsInfoCircle size="1.6rem" color="var(--color-icon)" />
         </button>
       </div>
-      <div className="title-container">
+      <div className="title-container" style={{ paddingLeft: '80px' }}>
         <h1>WORDLE/ZAMA</h1>
       </div>
       <div>
