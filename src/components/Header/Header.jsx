@@ -27,7 +27,7 @@ const Header = ({
           <BsInfoCircle size="1.6rem" color="var(--color-icon)" />
         </button>
       </div>
-      <div className="title-container" style={{ paddingLeft: '80px' }}>
+      <div className="title-container" style={{ paddingLeft: '85px' }}>
         <h1>WORDLE/ZAMA</h1>
       </div>
       <div>
