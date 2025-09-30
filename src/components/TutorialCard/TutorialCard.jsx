@@ -166,33 +166,27 @@ const TutorialCard = ({
           )}
 
           {type === 'setup' && steps && (
-            <div className={styles.steps}>
-              {steps.map((step, index) => (
-                <div key={index} className={styles.step}>
-                  <div className={styles.stepHeader}>
-                    <span className={styles.stepNumber}>{index + 1}</span>
-                    <h4 className={styles.stepTitle}>{step.title}</h4>
+            <div className={styles.deploymentContent}>
+              <div className={styles.deploymentSteps}>
+                {steps.map((step, index) => (
+                  <div key={index} className={styles.deploymentStep}>
+                    <h4>{step.title}</h4>
+                    <p>{step.description}</p>
+                    {step.command && (
+                      <code className={styles.deploymentCommand}>{step.command}</code>
+                    )}
+                    {step.details && step.details.length > 0 && (
+                      <ul className={styles.stepDetails}>
+                        {step.details.map((detail, detailIndex) => (
+                          <li key={detailIndex} className={styles.stepDetail}>
+                            {detail}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                  <p className={styles.stepDescription}>{step.description}</p>
-                  
-                  {step.command && (
-                    <div className={styles.commandBlock}>
-                      <span className={styles.commandLabel}>Command:</span>
-                      <code className={styles.command}>{step.command}</code>
-                    </div>
-                  )}
-                  
-                  {step.details && step.details.length > 0 && (
-                    <ul className={styles.stepDetails}>
-                      {step.details.map((detail, detailIndex) => (
-                        <li key={detailIndex} className={styles.stepDetail}>
-                          {detail}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
               {codeExample && (
                 <div className={styles.codeSection}>
                   <div className={styles.codeHeader}>
