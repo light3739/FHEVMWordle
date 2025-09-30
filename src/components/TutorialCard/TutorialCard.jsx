@@ -14,6 +14,10 @@ const TutorialCard = ({
   content,
   functions,
   faq,
+  prerequisites,
+  gasCosts,
+  liveDemo,
+  howToPlay,
   isExpanded, 
   isCompleted,
   onToggle 
@@ -118,6 +122,59 @@ const TutorialCard = ({
           {type === 'concept' && content && (
             <div className={styles.conceptContent}>
               <p className={styles.mainText}>{content.mainText}</p>
+              
+              {content.comparison && (
+                <div className={styles.comparisonSection}>
+                  <h4>{content.comparison.title}</h4>
+                  <div className={styles.comparisonGrid}>
+                    <div className={styles.comparisonColumn}>
+                      <h5>Traditional Wordle</h5>
+                      <ul>
+                        {content.comparison.traditional.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className={styles.comparisonColumn}>
+                      <h5>FHEVM Wordle</h5>
+                      <ul>
+                        {content.comparison.fhevm.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {content.steps && (
+                <div className={styles.stepsSection}>
+                  {content.steps.map((step, index) => (
+                    <div key={index} className={styles.stepItem}>
+                      <h4>{step.title}</h4>
+                      <p>{step.description}</p>
+                      {step.code && (
+                        <div className={styles.codeSection}>
+                          <div className={styles.codeHeader}>
+                            <span className={styles.codeTitle}>Code</span>
+                            <button 
+                              className={styles.copyButton}
+                              onClick={() => copyToClipboard(step.code)}
+                              title="Copy code"
+                            >
+                              {copiedCode === step.code ? '✓' : '📋'}
+                            </button>
+                          </div>
+                          <pre className={styles.codeBlock}>
+                            <code className={styles.code}>{step.code}</code>
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {content.keyPoints && (
                 <ul className={styles.keyPoints}>
                   {content.keyPoints.map((point, index) => (
@@ -125,6 +182,7 @@ const TutorialCard = ({
                   ))}
                 </ul>
               )}
+
               {content.imageExample && (
                 <div className={styles.imageSection}>
                   <div className={styles.imageHeader}>
@@ -142,6 +200,7 @@ const TutorialCard = ({
                   </div>
                 </div>
               )}
+
               {content.codeExample && (
                 <div className={styles.codeSection}>
                   <div className={styles.codeHeader}>
@@ -159,6 +218,7 @@ const TutorialCard = ({
                   </pre>
                 </div>
               )}
+
               {content.highlight && (
                 <div className={styles.highlight}>{content.highlight}</div>
               )}
@@ -167,6 +227,17 @@ const TutorialCard = ({
 
           {type === 'setup' && steps && (
             <div className={styles.deploymentContent}>
+              {prerequisites && (
+                <div className={styles.prerequisitesSection}>
+                  <h4>{prerequisites.title}</h4>
+                  <ul className={styles.prerequisitesList}>
+                    {prerequisites.items.map((item, index) => (
+                      <li key={index} className={styles.prerequisite}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
               <div className={styles.deploymentSteps}>
                 {steps.map((step, index) => (
                   <div key={index} className={styles.deploymentStep}>
@@ -245,6 +316,46 @@ const TutorialCard = ({
           {type === 'code-heavy' && content && (
             <div className={styles.codeHeavyContent}>
               <p className={styles.overview}>{content.overview}</p>
+              
+              {content.contractStructure && (
+                <div className={styles.contractStructureSection}>
+                  <h4>Contract Structure</h4>
+                  
+                  {content.contractStructure.constants && (
+                    <div className={styles.structureGroup}>
+                      <h5>Constants</h5>
+                      <ul>
+                        {content.contractStructure.constants.map((constant, index) => (
+                          <li key={index} className={styles.structureItem}>{constant}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {content.contractStructure.encryptedStorage && (
+                    <div className={styles.structureGroup}>
+                      <h5>Encrypted Storage</h5>
+                      <ul>
+                        {content.contractStructure.encryptedStorage.map((storage, index) => (
+                          <li key={index} className={styles.structureItem}>{storage}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {content.contractStructure.gameState && (
+                    <div className={styles.structureGroup}>
+                      <h5>Game State</h5>
+                      <ul>
+                        {content.contractStructure.gameState.map((state, index) => (
+                          <li key={index} className={styles.structureItem}>{state}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {content.keyFeatures && (
                 <ul className={styles.keyFeatures}>
                   {content.keyFeatures.map((feature, index) => (
@@ -252,10 +363,31 @@ const TutorialCard = ({
                   ))}
                 </ul>
               )}
+
+              {gasCosts && (
+                <div className={styles.gasCostsSection}>
+                  <h4>{gasCosts.title}</h4>
+                  <div className={styles.gasOperations}>
+                    {gasCosts.operations.map((operation, index) => (
+                      <div key={index} className={styles.gasOperation}>
+                        <div className={styles.gasOperationHeader}>
+                          <span className={styles.gasOperationName}>{operation.name}</span>
+                          <span className={styles.gasOperationCost}>{operation.gas}</span>
+                        </div>
+                        <p className={styles.gasOperationDescription}>{operation.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={styles.gasTotal}>
+                    <strong>Total: {gasCosts.total}</strong>
+                  </div>
+                </div>
+              )}
+
               {codeExample && (
                 <div className={styles.codeSection}>
                   <div className={styles.codeHeader}>
-                    <span className={styles.codeTitle}>Function Implementation</span>
+                    <span className={styles.codeTitle}>Contract Structure</span>
                     <button 
                       className={styles.copyButton}
                       onClick={() => copyToClipboard(codeExample)}
@@ -269,6 +401,7 @@ const TutorialCard = ({
                   </pre>
                 </div>
               )}
+              
               {functions && (
                 <div className={styles.functionsList}>
                   <h4>Key Functions:</h4>
@@ -362,6 +495,7 @@ const TutorialCard = ({
           {type === 'deployment' && content && (
             <div className={styles.deploymentContent}>
               <p className={styles.mainText}>{content.mainText}</p>
+              
               {content.steps && (
                 <div className={styles.deploymentSteps}>
                   {content.steps.map((step, index) => (
@@ -378,6 +512,46 @@ const TutorialCard = ({
                   ))}
                 </div>
               )}
+
+              {liveDemo && (
+                <div className={styles.liveDemoSection}>
+                  <h4>{liveDemo.title}</h4>
+                  <div className={styles.liveDemoInfo}>
+                    <div className={styles.liveDemoItem}>
+                      <strong>Contract Address:</strong> 
+                      <code>{liveDemo.contractAddress}</code>
+                    </div>
+                    <div className={styles.liveDemoItem}>
+                      <strong>Network:</strong> {liveDemo.network}
+                    </div>
+                    <div className={styles.liveDemoItem}>
+                      <strong>Explorer:</strong> 
+                      <a href={liveDemo.explorer} target="_blank" rel="noopener noreferrer">
+                        View on Etherscan
+                      </a>
+                    </div>
+                    <div className={styles.liveDemoItem}>
+                      <strong>Merkle Root:</strong> 
+                      <code>{liveDemo.merkleRoot}</code>
+                    </div>
+                    <div className={styles.liveDemoItem}>
+                      <strong>Dictionary:</strong> {liveDemo.dictionary}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {howToPlay && (
+                <div className={styles.howToPlaySection}>
+                  <h4>How to Play</h4>
+                  <ol className={styles.howToPlayList}>
+                    {howToPlay.map((step, index) => (
+                      <li key={index} className={styles.howToPlayItem}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
               {codeExample && (
                 <div className={styles.codeSection}>
                   <div className={styles.codeHeader}>
@@ -401,8 +575,22 @@ const TutorialCard = ({
           {type === 'faq' && content && (
             <div className={styles.faqContent}>
               <p className={styles.mainText}>{content.mainText}</p>
+              
+              {content.faq && (
+                <div className={styles.faqList}>
+                  <h4>Frequently Asked Questions:</h4>
+                  {content.faq.map((item, index) => (
+                    <div key={index} className={styles.faqItem}>
+                      <h5 className={styles.faqQuestion}>{item.question}</h5>
+                      <p className={styles.faqAnswer}>{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {content.problems && (
                 <div className={styles.problemsList}>
+                  <h4>Troubleshooting</h4>
                   {content.problems.map((problem, index) => (
                     <div key={index} className={styles.problemItem}>
                       <h4>{problem.title}</h4>
@@ -412,17 +600,6 @@ const TutorialCard = ({
                           <li key={solIndex} className={styles.solution}>{solution}</li>
                         ))}
                       </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {faq && (
-                <div className={styles.faqList}>
-                  <h4>Frequently Asked Questions:</h4>
-                  {faq.map((item, index) => (
-                    <div key={index}>
-                      <h5 className={styles.faqQuestion}>{item.question}</h5>
-                      <p className={styles.faqAnswer}>{item.answer}</p>
                     </div>
                   ))}
                 </div>

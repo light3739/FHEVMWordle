@@ -36,171 +36,287 @@ const InteractiveTutorial = () => {
   const tutorialCards = [
     {
       id: 'intro',
-      title: 'What is FHEVM?',
-      description: 'Understanding Fully Homomorphic Encryption in Blockchain',
+      title: 'What Makes FHEVM Wordle Special?',
+      description: 'The first fully confidential on-chain Wordle game',
       type: 'concept',
       content: {
-        mainText: `Fully homomorphic encryption (FHE) lets smart contracts process data while it stays encrypted. In other words, computations can be performed on ciphertexts so that only the result (when decrypted) reveals the correct answer, without revealing the inputs.`,
+        mainText: `FHEVM Wordle is **the first fully confidential on-chain Wordle game** built with Fully Homomorphic Encryption. The secret word is encrypted on the blockchain, and your smart contract verifies guesses **without ever decrypting the secret**!`,
+        comparison: {
+          title: 'Traditional vs FHEVM Wordle',
+          traditional: [
+            'Secret: "HELLO"',
+            'Storage: Client',
+            'Validation: JavaScript',
+            'Trust: Required'
+          ],
+          fhevm: [
+            'Secret: euint8[5] (encrypted)',
+            'Storage: Blockchain',
+            'Validation: Smart Contract',
+            'Trust: Zero (cryptographically proven)'
+          ]
+        },
         keyPoints: [
-          '🔒 Data remains encrypted even during computations',
-          '⚡ Solves blockchain\'s privacy problem',
-          '🌐 All data on public ledger is visible by default',
-          '🛡️ FHE keeps user data confidential during on-chain computation'
+          '🔐 Secret word stored encrypted on-chain',
+          '🧮 Homomorphic operations: FHE.eq(), FHE.or(), FHE.select()',
+          '🔓 Async decryption with callback pattern',
+          '📊 Batch processing: decrypt 5 letters in one request',
+          '⚡ Gas optimization: ~25,000 gas saved per game'
         ],
-        highlight: 'This "holy grail" of cryptography solves blockchain\'s privacy problem!',
-        imageExample: {
-          src: '/image.avif',
-          alt: 'FHEVM Architecture Diagram',
-          caption: 'FHEVM enables computation on encrypted data while preserving privacy'
-        }
+        highlight: 'This "holy grail" of cryptography solves blockchain\'s privacy problem!'
       }
     },
     {
       id: 'setup',
-      title: 'Environment Setup',
-      description: 'Installing Node.js, Hardhat and React for development',
+      title: 'Quick Start Setup',
+      description: 'Get FHEVM Wordle running in minutes',
       type: 'setup',
+      prerequisites: {
+        title: 'Prerequisites',
+        items: [
+          'node >= 16.0.0',
+          'npm >= 8.0.0',
+          'MetaMask or compatible Web3 wallet'
+        ]
+      },
       steps: [
         {
-          title: 'Install Node.js',
-          description: 'Begin by installing a supported Node.js LTS version',
-          command: 'node --version',
+          title: 'Clone Repository',
+          description: 'Get the FHEVM Wordle source code',
+          command: 'git clone https://github.com/light3739/FHEVMWordle.git',
           details: [
-            'Use even-numbered version (e.g. v18 or v20)',
-            'Check compatibility with your system',
-            'Ensure npm is also installed'
+            'Clone the official repository',
+            'Navigate to the project directory',
+            'All dependencies are pre-configured'
           ]
         },
         {
-          title: 'Initialize Project',
-          description: 'Create a new project folder and initialize it',
-          command: 'npm init',
+          title: 'Install Dependencies',
+          description: 'Install all required packages',
+          command: 'npm install',
           details: [
-            'Create a new project folder',
-            'Initialize project with npm init',
-            'Follow instructions to create package.json'
+            'Installs Hardhat with FHEVM plugin',
+            'Installs React frontend dependencies',
+            'Includes ethers.js and Zama SDK'
           ]
         },
         {
-          title: 'Install Hardhat and FHEVM',
-          description: 'Install Hardhat and FHEVM plugin',
-          command: 'npm install --save-dev hardhat @fhevm/hardhat-plugin',
+          title: 'Environment Setup',
+          description: 'Configure your environment variables',
+          command: 'cp .env.example .env',
           details: [
-            'Hardhat - Ethereum development environment',
-            '@fhevm/hardhat-plugin - plugin for FHEVM support',
-            'These tools are essential for FHEVM work'
+            'Copy environment template',
+            'Add your INFURA_API_KEY',
+            'Add PRIVATE_KEY for deployment',
+            'Set REACT_APP_CONTRACT_ADDRESS after deployment'
           ]
         }
       ],
       codeExample: `# Complete setup sequence
-npm init
-npm install --save-dev hardhat @fhevm/hardhat-plugin
-npx hardhat init
+git clone https://github.com/light3739/FHEVMWordle.git
+cd FHEVMWordle
+npm install
 
-# Create React frontend
-npx create-react-app frontend
-cd frontend
-npm install ethers @zama-fhe/relayer-sdk
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your credentials:
+# - INFURA_API_KEY
+# - PRIVATE_KEY (for deployment)
+# - REACT_APP_CONTRACT_ADDRESS (after deployment)
 
-# Verify installation
-npm run build
-npm test`
+# Start the React app
+npm start
+# Open http://localhost:3000`
     },
     {
-      id: 'libraries',
-      title: 'Installing FHEVM Libraries',
-      description: 'Connecting Zama Solidity libraries and TFHE functions',
-      type: 'installation',
+      id: 'how-it-works',
+      title: 'How FHEVM Wordle Works',
+      description: 'The FHE Magic Explained - Step by Step',
+      type: 'concept',
       content: {
-        mainText: 'Our contracts will use the Zama Solidity library and TFHE functions. Install the required dependencies:',
-        installation: {
-          command: 'npm install @fhevm/solidity',
-          description: 'This provides Solidity contracts like FHE.sol and network configs.'
-        },
-        imports: {
-          title: 'Imports in Solidity contracts',
-          description: 'In your Solidity contract files, import the FHE library and network configuration:'
-        }
-      },
-      codeExample: `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
-import { FHE, euint8, euint32, externalEuint8 } from "@fhevm/solidity/lib/FHE.sol";
-import { SepoliaConfig } from "@fhevm/solidity/config/ZamaConfig.sol";
+        mainText: 'FHEVM Wordle uses Fully Homomorphic Encryption to keep the secret word encrypted while still allowing the smart contract to verify guesses. Here\'s how the magic happens:',
+        steps: [
+          {
+            title: 'Step 1: Encrypt the Secret Word (Client-side)',
+            description: 'User selects "HELLO" and it gets encrypted before going to blockchain',
+            code: `const word = 'HELLO';
+const letters = word.split('').map(ch => ch.charCodeAt(0) - 64); // [8,5,12,12,15]
 
-contract FHEWordle is SepoliaConfig {
-    // Encrypted state (private word & mask)
-    euint8[5] private secretLetters;  // five encrypted letters
-    euint32 private secretMask;        // 26-bit mask of used letters
+const input = fheInstance.createEncryptedInput(contractAddress, userAddress);
+letters.forEach(letter => input.add8(letter));
+const { handles, inputProof } = await input.encrypt();
+// handles = [euint8, euint8, euint8, euint8, euint8] (encrypted!)`
+          },
+          {
+            title: 'Step 2: Store on Blockchain (Encrypted)',
+            description: 'Secret word is stored encrypted - NO ONE can see it!',
+            code: `function setEncryptedSecretWord(...) external {
+    // Verify word is in valid dictionary (5,757 words)
+    require(MerkleProof.verify(merkleProof, merkleRoot, leaf), "Invalid word");
     
-    // Public state
-    bool public wordSet;
-    bool public gameStarted;
-    uint8 public nGuesses;
-    
-    // Store plaintext guesses and Merkle proofs for validity
-    uint32[5] public guesses;
-    bytes32 constant public rootAllowed = 0xABC...; // Merkle root of valid words
-    
-    // Event emitted when a guess is evaluated and decrypted
-    event GuessEvaluated(uint8 indexed guessIndex, uint8 eqMask, uint32 letterMask);
+    // Store encrypted letters - NO ONE can see them!
+    for (uint8 i = 0; i < 5; i++) {
+        encryptedSecretWords[player][i] = FHE.fromExternal(
+            encryptedLetters[i].fromBytes(),
+            inputProof
+        );
+        FHE.allowThis(encryptedSecretWords[player][i]);
+    }
 }`
+          },
+          {
+            title: 'Step 3: Submit a Guess (Plain Text)',
+            description: 'User guesses "WORLD" in plain text',
+            code: `// User guesses "WORLD"
+const guess = [23, 15, 18, 12, 4]; // W=23, O=15, R=18, L=12, D=4
+await contract.submitGuess(guess);`
+          },
+          {
+            title: 'Step 4: Compute Results (Homomorphic - The Magic!)',
+            description: 'Smart contract compares encrypted secret with plain guess',
+            code: `// Check exact match - COMPUTED ON ENCRYPTED DATA!
+ebool exact = FHE.eq(guessLetter, secretLetter);
+
+// Check if letter exists anywhere in the word
+ebool present = FHE.asEbool(false);
+for (uint8 q = 0; q < 5; q++) {
+    if (q != position) {
+        present = FHE.or(present, FHE.eq(guessLetter, encryptedSecretWords[msg.sender][q]));
+    }
+}
+
+// Encode result: 1=absent, 2=present, 3=correct
+euint8 result = FHE.asEuint8(1);
+result = FHE.select(FHE.and(FHE.not(exact), present), FHE.asEuint8(2), result);
+result = FHE.select(exact, FHE.asEuint8(3), result);`
+          },
+          {
+            title: 'Step 5: Decrypt Results (Zama KMS)',
+            description: 'Results are decrypted asynchronously by Zama KMS',
+            code: `function requestDecryptResults() external {
+    // Batch decrypt all 5 results in ONE call!
+    bytes32[] memory cts = new bytes32[](5);
+    for (uint8 i = 0; i < 5; i++) {
+        cts[i] = FHE.toBytes32(encryptedResults[msg.sender][lastAttempt][i]);
+    }
+    
+    // Async decryption request to Zama KMS
+    uint256 requestId = FHE.requestDecryption(cts, this.resultsCallback.selector);
+}`
+          },
+          {
+            title: 'Step 6: Display Results (UI)',
+            description: 'Frontend receives decrypted results and shows colors',
+            code: `contract.on('GuessEvaluated', (player, attemptNumber, results) => {
+  // results = [1,2,1,3,1]
+  // Transform to colors:
+  // 1 = ⬛ (absent)
+  // 2 = 🟨 (present, wrong position)  
+  // 3 = 🟩 (correct position)
+  
+  // Display: W⬛ O🟨 R⬛ L🟩 D⬛
+  updateGrid(
+    results.map(r => (r === 3 ? 'correct' : r === 2 ? 'present' : 'absent'))
+  );
+});`
+          }
+        ]
+      }
     },
     {
       id: 'contract',
-      title: 'Writing Smart Contract',
-      description: 'Creating game logic using FHEVM',
+      title: 'Smart Contract Overview',
+      description: 'Main Contract: FHEVMWordleMerkle.sol',
       type: 'code-heavy',
       content: {
-        overview: 'Below is a simplified structure of our Wordle contract. We use euint8 for each secret letter (0–25 for a–z) and euint32 for a 26-bit mask.',
+        overview: 'The main contract uses encrypted storage and homomorphic operations to maintain game state while keeping the secret word confidential.',
+        contractStructure: {
+          constants: [
+            'uint8 public constant WORD_LENGTH = 5',
+            'uint8 public constant MAX_ATTEMPTS = 6', 
+            'uint256 public constant GAME_TIMEOUT = 24 hours'
+          ],
+          encryptedStorage: [
+            'mapping(address => euint8[5]) private encryptedSecretWords',
+            'mapping(address => euint8[5][6]) private encryptedGuesses',
+            'mapping(address => euint8[5][6]) private encryptedResults'
+          ],
+          gameState: [
+            'mapping(address => GameData) public games',
+            'mapping(address => PlayerStats) public playerStats'
+          ]
+        },
         keyFeatures: [
-          '🔐 Private state stays encrypted',
-          '📊 Public state or events reveal only allowed info',
-          '🎯 Using masks for efficient letter checking',
-          '⚡ Avoiding loops in encrypted logic'
+          '🔐 Secret word stored encrypted on-chain',
+          '🧮 Homomorphic operations: FHE.eq(), FHE.or(), FHE.select()',
+          '📊 Batch decryption: 5 values in 1 request',
+          '⚡ Gas optimized: ~25,000 gas saved per game',
+          '🛡️ Merkle Tree validation (5,757 valid words)'
         ]
       },
       functions: [
         {
-          name: 'submitWord',
-          description: 'Function for setting secret word (relayer only)',
-          purpose: 'Allows privileged actor to encrypt and submit target word'
+          name: 'startGame(bytes32 sessionHash)',
+          description: 'Initialize new game and select random word',
+          purpose: 'Sets up game state and selects word from dictionary'
         },
         {
-          name: 'guessWord',
-          description: 'Function for recording player guess',
-          purpose: 'Players submit guesses in plaintext with Merkle proof'
+          name: 'setEncryptedSecretWord(...)',
+          description: 'Store encrypted secret word with Merkle proof',
+          purpose: 'Validates word and stores encrypted letters'
         },
         {
-          name: 'evaluateGuess',
-          description: 'Function for evaluating guess',
-          purpose: 'Computes feedback without revealing secret'
+          name: 'submitGuess(uint8[5] calldata guess)',
+          description: 'Submit player guess and evaluate with FHE',
+          purpose: 'Compares guess against encrypted secret word'
+        },
+        {
+          name: 'requestDecryptResults()',
+          description: 'Request batch decryption of results',
+          purpose: 'Gets decrypted feedback for UI display'
+        },
+        {
+          name: 'resultsCallback(uint256 requestId, bytes memory clear)',
+          description: 'Receive decrypted results from Zama KMS',
+          purpose: 'Processes decrypted results and emits events'
         }
       ],
-      codeExample: `function submitWord(euint8 l0, euint8 l1, euint8 l2, euint8 l3, euint8 l4) external onlyRelayer {
-    require(!wordSet, "word already set");
-    secretLetters[0] = l0;
-    secretLetters[1] = l1;
-    secretLetters[2] = l2;
-    secretLetters[3] = l3;
-    secretLetters[4] = l4;
-    
-    // Build a mask: for each letter l, set bit 1<<l
-    secretMask = 
-        TFHE.or(
-            TFHE.shl(TFHE.asEuint32(1), secretLetters[0]),
-            TFHE.or(
-                TFHE.shl(TFHE.asEuint32(1), secretLetters[1]),
-                TFHE.or(
-                    TFHE.shl(TFHE.asEuint32(1), secretLetters[2]),
-                    TFHE.or(
-                        TFHE.shl(TFHE.asEuint32(1), secretLetters[3]),
-                        TFHE.shl(TFHE.asEuint32(1), secretLetters[4])
-                    )
-                )
-            )
-        );
-    wordSet = true;
-    gameStarted = true;
+      gasCosts: {
+        title: 'Gas Costs Breakdown',
+        operations: [
+          { name: 'startGame()', gas: '~225,000', description: 'Initialize game state, select random word' },
+          { name: 'setEncryptedSecretWord()', gas: '~7,950,000', description: '5× FHE.fromExternal + 5× FHE.allowThis (expensive!)' },
+          { name: 'submitGuess()', gas: '~325,000', description: 'Store guess + evaluate with FHE operations' },
+          { name: 'requestDecryptResults()', gas: '~75,000', description: 'Request batch decryption from KMS' }
+        ],
+        total: '~8,575,000 gas per complete game cycle with 1 guess'
+      },
+      codeExample: `contract FHEVMWordleMerkle is SepoliaConfig {
+    // Constants
+    uint8 public constant WORD_LENGTH = 5;
+    uint8 public constant MAX_ATTEMPTS = 6;
+    uint256 public constant GAME_TIMEOUT = 24 hours;
+
+    // Encrypted storage
+    mapping(address => euint8[5]) private encryptedSecretWords;
+    mapping(address => euint8[5][6]) private encryptedGuesses;
+    mapping(address => euint8[5][6]) private encryptedResults;
+
+    // Game state
+    mapping(address => GameData) public games;
+    mapping(address => PlayerStats) public playerStats;
+
+    // Core functions
+    function startGame(bytes32 sessionHash) external;
+    function setEncryptedSecretWord(...) external;
+    function submitGuess(uint8[5] calldata guess) external;
+    function requestDecryptResults() external;
+    function resultsCallback(uint256 requestId, bytes memory clear) external;
+
+    // Game management
+    function pauseMyGame() external;
+    function unpauseMyGame() external;
+    function forfeitGame() external;
 }`
     },
     {
@@ -209,81 +325,114 @@ contract FHEWordle is SepoliaConfig {
       description: 'Connecting React frontend to FHEVM smart contracts',
       type: 'integration',
       content: {
-        mainText: 'In the React app, use ethers and Zama\'s Relayer SDK to interact:',
+        mainText: 'The React frontend uses ethers.js and Zama\'s Relayer SDK to interact with FHEVM contracts. Here\'s how to set up the connection:',
         setup: {
           title: 'Contract Setup',
-          description: 'Create a function to set up contract connection'
+          description: 'Initialize FHEVM instance and connect to contract'
         },
         features: [
           '🔗 Connect to wallet via MetaMask',
-          '🔐 Encrypt input data using Relayer SDK',
-          '📡 Send encrypted transactions',
-          '👂 Listen to events for results'
+          '🔐 Initialize FHEVM instance with Sepolia config',
+          '📡 Send encrypted transactions using Relayer SDK',
+          '👂 Listen to events for async results',
+          '🎨 Display real-time game feedback'
         ]
       },
       codeExample: `import { ethers } from 'ethers';
-import { FhevmRelayerProvider } from '@zama-fhe/relayer-sdk';
-import FHEWordleABI from './artifacts/FHEWordle.json';
+import { initSDK, createInstance, SepoliaConfig } from '@zama-fhe/relayer-sdk/bundle';
 
-async function setupContract() {
-  await window.ethereum.request({ method: 'eth_requestAccounts' });
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
-  const signer = provider.getSigner();
-  
-  // RelayerProvider wraps signer to handle FHE inputs
-  const relayer = new FhevmRelayerProvider(provider);
-  const contractAddress = "<DEPLOYED_CONTRACT_ADDRESS>";
-  const wordle = new ethers.Contract(contractAddress, FHEWordleABI, relayer);
-  return wordle;
-}
+// Initialize FHEVM
+await initSDK(); // Load needed WASM
+const config = { ...SepoliaConfig, network: window.ethereum };
+const fheInstance = await createInstance(config);
 
-// Submit encrypted word
-const letters = [16, 20, 8, 2, 10]; // "quick"
-const input = await relayer.createEncryptedInput(wordle.address, await signer.getAddress());
-letters.forEach(num => input.add8(num));
+// Setup contract connection
+const provider = new ethers.BrowserProvider(window.ethereum);
+const signer = await provider.getSigner();
+const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+// Encrypt secret word
+const word = 'HELLO';
+const letters = word.split('').map(ch => ch.charCodeAt(0) - 64);
+const input = fheInstance.createEncryptedInput(CONTRACT_ADDRESS, await signer.getAddress());
+letters.forEach(letter => input.add8(letter));
 const { handles, inputProof } = await input.encrypt();
 
-const tx = await wordle.submitWord(
-  handles[0], handles[1], handles[2], handles[3], handles[4],
-  inputProof
+// Submit encrypted word
+const tx = await contract.setEncryptedSecretWord(
+  await signer.getAddress(),
+  wordIndex,
+  handles,
+  inputProof,
+  merkleProof,
+  leaf
 );
-await tx.wait();`
+await tx.wait();
+
+// Listen for results
+contract.on('GuessEvaluated', (player, attemptNumber, results) => {
+  // results = [1,2,1,3,1] -> ⬛🟨⬛🟩⬛
+  updateGameGrid(results);
+});`
     },
     {
       id: 'deployment',
-      title: 'Production Deployment',
-      description: 'Deploying your FHEVM application to production',
+      title: 'Deploy to Sepolia',
+      description: 'Deploying FHEVM Wordle to Sepolia testnet',
       type: 'deployment',
       content: {
-        mainText: 'To deploy the project, use a script or Hardhat task.',
-      steps: [
-        {
-            title: 'Network Setup',
-            description: 'Ensure hardhat.config.js is configured for Sepolia',
-            command: 'npx hardhat run scripts/deploy.js --network sepolia'
+        mainText: 'Deploy the FHEVM Wordle contract to Sepolia testnet and connect your frontend.',
+        steps: [
+          {
+            title: 'Compile Contracts',
+            description: 'Build the smart contracts',
+            command: 'npx hardhat compile'
           },
           {
-            title: 'Get Contract',
-            description: 'Script typically prints the contract address',
-            note: 'Save the address for use in frontend'
+            title: 'Deploy to Sepolia',
+            description: 'Deploy contract to Sepolia testnet',
+            command: 'npx hardhat run deploy/01-deploy-wordle.js --network sepolia'
           },
           {
-            title: 'Verify Deployment',
-            description: 'Verify contract on Etherscan',
+            title: 'Update Environment',
+            description: 'Add contract address to frontend',
+            note: 'Update REACT_APP_CONTRACT_ADDRESS in .env with deployed address'
+          },
+          {
+            title: 'Verify on Etherscan',
+            description: 'Verify contract source code',
             command: 'npx hardhat verify --network sepolia <CONTRACT_ADDRESS>'
           }
         ]
       },
-      codeExample: `// scripts/deploy.js
+      liveDemo: {
+        title: 'Live Demo',
+        contractAddress: '0xFA23f4beB2238261011Edec693e08871732a0108',
+        network: 'Sepolia (Chain ID: 11155111)',
+        explorer: 'https://sepolia.etherscan.io/address/0xFA23f4beB2238261011Edec693e08871732a0108',
+        merkleRoot: '0xf8ee73c7257f661083f8bc64309b79cdbc6d3d37b24dc694eab774ae3120794b',
+        dictionary: '5,756 valid English words'
+      },
+      howToPlay: [
+        '🔗 Connect Wallet (MetaMask on Sepolia)',
+        '🎮 Start New Game (contract auto-selects random word)',
+        '⏳ Wait for Setup (~30-60 seconds for encryption)',
+        '🎯 Make Guesses (type 5-letter words)',
+        '🎨 Interpret Results (🟩🟨⬛ colors)',
+        '🏆 Win or Learn (6 attempts maximum)'
+      ],
+      codeExample: `// deploy/01-deploy-wordle.js
 const { ethers } = require("hardhat");
 
 async function main() {
-  const FHEWordle = await ethers.getContractFactory("FHEWordle");
-  const wordle = await FHEWordle.deploy();
+  const FHEVMWordleMerkle = await ethers.getContractFactory("FHEVMWordleMerkle");
+  const wordle = await FHEVMWordleMerkle.deploy();
   
   await wordle.waitForDeployment();
   
-  console.log("FHEWordle deployed to:", await wordle.getAddress());
+  console.log("FHEVMWordleMerkle deployed to:", await wordle.getAddress());
+  console.log("Merkle Root:", await wordle.merkleRoot());
+  console.log("Dictionary Size:", await wordle.merkleLeaves());
 }
 
 main().catch((error) => {
@@ -294,57 +443,73 @@ main().catch((error) => {
     {
       id: 'faq',
       title: 'FAQ & Troubleshooting',
-      description: 'Common issues and solutions for FHEVM development',
+      description: 'Common questions and solutions for FHEVM Wordle',
       type: 'faq',
       content: {
-        mainText: 'Here are solutions for the most common problems when working with FHEVM:',
-        problems: [
+        mainText: 'Here are answers to the most common questions about FHEVM Wordle:',
+        faq: [
           {
-            title: '🔗 Wallet/Network Issues',
-            description: 'Make sure MetaMask is connected to the same network as the contract',
-            solutions: [
-              'For local testing use localhost:8545',
-              'For real FHE use Sepolia',
-              'Wrong chainId will cause transactions to fail'
-            ]
+            question: 'Do I need to understand cryptography?',
+            answer: 'No! This project abstracts away the complexity. You just use FHE.eq(), FHE.or(), etc.'
           },
           {
-            title: '⏱️ Long Decryption Delays',
-            description: 'In Sepolia mode, oracle callbacks can take several minutes',
-            solutions: [
-              'Be patient after each guess',
-              'Check event logs or GuessEvaluated event',
-              'Don\'t rely on immediate return values'
-            ]
+            question: 'Why is gas so expensive?',
+            answer: 'FHE operations are computationally intensive. Regular comparison: ~20 gas, FHE comparison: ~50,000 gas. But the alternative is NO on-chain privacy at all!'
           },
           {
-            title: '💥 Smart Contract Reverts',
-            description: 'Common gotchas include forgotten roles or mismatched parameter types',
-            solutions: [
-              'Check only onlyRelayer or onlyPlayer roles',
-              'For encrypted inputs, ensure you pass correct proof',
-              'Use Hardhat console logs or events for debugging'
-            ]
+            question: 'Can I use this in production?',
+            answer: 'FHEVM is currently in testnet. For production use, wait for mainnet launch or check Zama\'s roadmap.'
           },
           {
-            title: '🔄 Hardhat Mode vs Sepolia',
-            description: 'If code works in Hardhat but not on Sepolia',
-            solutions: [
-              'Check that you added SepoliaConfig and imported FHE.sol',
-              'Ensure you set Infura API key and mnemonic',
-              'Hardhat mock mode doesn\'t catch network config issues'
-            ]
+            question: 'How long does decryption take?',
+            answer: 'Usually 30-60 seconds. Zama is working on making this faster.'
+          },
+          {
+            question: 'Can the contract owner cheat?',
+            answer: 'No! The secret is encrypted and even the owner can\'t decrypt it without going through proper KMS flow.'
+          },
+          {
+            question: 'What if I refresh the page mid-game?',
+            answer: 'Game state is stored on-chain! Just reconnect your wallet and continue.'
           }
         ]
       },
-      faq: [
+      problems: [
         {
-          question: 'How do I deploy this project?',
-          answer: 'Use a script or Hardhat task to deploy. For example: npx hardhat run scripts/deploy.js --network sepolia'
+          title: '🔗 Wallet/Network Issues',
+          description: 'Make sure MetaMask is connected to Sepolia network',
+          solutions: [
+            'Switch MetaMask to Sepolia testnet (Chain ID: 11155111)',
+            'Get test ETH from Sepolia Faucet',
+            'Wrong chainId will cause transactions to fail'
+          ]
         },
         {
-          question: 'How to switch contract to production mode?',
-          answer: 'When deploying on Sepolia, ensure hardhat.config.js sets chainId: 11155111 and uses SepoliaConfig.'
+          title: '⏱️ Long Decryption Delays',
+          description: 'Decryption can take 30-60 seconds',
+          solutions: [
+            'Be patient after each guess',
+            'Check browser console for events',
+            'Don\'t refresh the page during decryption'
+          ]
+        },
+        {
+          title: '💥 Transaction Failures',
+          description: 'Common causes of failed transactions',
+          solutions: [
+            'Ensure you have enough Sepolia ETH for gas',
+            'Check that word is in the valid dictionary',
+            'Verify Merkle proof is correct'
+          ]
+        },
+        {
+          title: '🔄 Frontend Connection Issues',
+          description: 'If frontend can\'t connect to contract',
+          solutions: [
+            'Check REACT_APP_CONTRACT_ADDRESS in .env',
+            'Ensure contract is deployed on Sepolia',
+            'Verify ABI matches deployed contract'
+          ]
         }
       ]
     }
