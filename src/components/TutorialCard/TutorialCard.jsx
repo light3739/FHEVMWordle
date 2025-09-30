@@ -9,10 +9,27 @@ const TutorialCard = ({
   icon, 
   steps, 
   codeExample, 
+  imageExample,
+  type,
+  content,
+  functions,
+  faq,
   isExpanded, 
+  isCompleted,
   onToggle 
 }) => {
   const [showCode, setShowCode] = useState(false);
+  const [copiedCode, setCopiedCode] = useState('');
+
+  const copyToClipboard = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(''), 2000);
+    } catch (err) {
+      console.error('Failed to copy code:', err);
+    }
+  };
 
   const handleToggle = () => {
     onToggle(id);
@@ -21,9 +38,20 @@ const TutorialCard = ({
   const cardClasses = classNames({
     [styles.card]: true,
     [styles.expanded]: isExpanded,
+    [styles.completed]: isCompleted,
   });
 
   const getIcon = () => {
+    // Если иконка - эмодзи, просто возвращаем её
+    if (icon && typeof icon === 'string' && icon.length > 0) {
+      // Проверяем, является ли это эмодзи (не SVG case)
+      const isEmoji = !['rocket', 'shield', 'code', 'settings', 'book', 'link', 'question'].includes(icon);
+      if (isEmoji) {
+        return <span className={styles.emojiIcon}>{icon}</span>;
+      }
+    }
+    
+    // Иначе используем SVG иконки
     switch (icon) {
       case 'rocket':
         return (
@@ -86,54 +114,323 @@ const TutorialCard = ({
 
       {isExpanded && (
         <div className={styles.cardContent}>
-          <div className={styles.steps}>
-            {steps.map((step, index) => (
-              <div key={index} className={styles.step}>
-                <div className={styles.stepHeader}>
-                  <span className={styles.stepNumber}>{index + 1}</span>
-                  <h4 className={styles.stepTitle}>{step.title}</h4>
-                </div>
-                <p className={styles.stepDescription}>{step.description}</p>
-                
-                {step.command && (
-                  <div className={styles.commandBlock}>
-                    <span className={styles.commandLabel}>Command:</span>
-                    <code className={styles.command}>{step.command}</code>
+          {/* Render content based on card type */}
+          {type === 'concept' && content && (
+            <div className={styles.conceptContent}>
+              <p className={styles.mainText}>{content.mainText}</p>
+              {content.keyPoints && (
+                <ul className={styles.keyPoints}>
+                  {content.keyPoints.map((point, index) => (
+                    <li key={index} className={styles.keyPoint}>{point}</li>
+                  ))}
+                </ul>
+              )}
+              {content.imageExample && (
+                <div className={styles.imageSection}>
+                  <div className={styles.imageHeader}>
+                    <span className={styles.imageTitle}>Visual Example</span>
                   </div>
-                )}
-                
-                {step.details && step.details.length > 0 && (
-                  <ul className={styles.stepDetails}>
-                    {step.details.map((detail, detailIndex) => (
-                      <li key={detailIndex} className={styles.stepDetail}>
-                        {detail}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {codeExample && (
-            <div className={styles.codeSection}>
-              <div className={styles.codeHeader}>
-                <span className={styles.codeTitle}>Code Example</span>
-                <button 
-                  className={styles.codeToggle}
-                  onClick={() => setShowCode(!showCode)}
-                >
-                  {showCode ? 'Hide Code' : 'Show Code'}
-                </button>
-              </div>
-              
-              {showCode && (
-                <pre className={styles.codeBlock}>
-                  <code className={styles.code}>{codeExample}</code>
-                </pre>
+                  <div className={styles.imageContainer}>
+                    <img 
+                      src={content.imageExample.src} 
+                      alt={content.imageExample.alt}
+                      className={styles.image}
+                    />
+                    {content.imageExample.caption && (
+                      <p className={styles.imageCaption}>{content.imageExample.caption}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {content.codeExample && (
+                <div className={styles.codeSection}>
+                  <div className={styles.codeHeader}>
+                    <span className={styles.codeTitle}>Code Example</span>
+                    <button 
+                      className={styles.copyButton}
+                      onClick={() => copyToClipboard(content.codeExample)}
+                      title="Copy code"
+                    >
+                      {copiedCode === content.codeExample ? '✓' : '📋'}
+                    </button>
+                  </div>
+                  <pre className={styles.codeBlock}>
+                    <code className={styles.code}>{content.codeExample}</code>
+                  </pre>
+                </div>
+              )}
+              {content.highlight && (
+                <div className={styles.highlight}>{content.highlight}</div>
               )}
             </div>
           )}
+
+          {type === 'setup' && steps && (
+            <div className={styles.deploymentContent}>
+              <div className={styles.deploymentSteps}>
+                {steps.map((step, index) => (
+                  <div key={index} className={styles.deploymentStep}>
+                    <h4>{step.title}</h4>
+                    <p>{step.description}</p>
+                    {step.command && (
+                      <code className={styles.deploymentCommand}>{step.command}</code>
+                    )}
+                    {step.details && step.details.length > 0 && (
+                      <ul className={styles.stepDetails}>
+                        {step.details.map((detail, detailIndex) => (
+                          <li key={detailIndex} className={styles.stepDetail}>
+                            {detail}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {codeExample && (
+                <div className={styles.codeSection}>
+                  <div className={styles.codeHeader}>
+                    <span className={styles.codeTitle}>Complete Setup</span>
+                    <button 
+                      className={styles.copyButton}
+                      onClick={() => copyToClipboard(codeExample)}
+                      title="Copy code"
+                    >
+                      {copiedCode === codeExample ? '✓' : '📋'}
+                    </button>
+                  </div>
+                  <pre className={styles.codeBlock}>
+                    <code className={styles.code}>{codeExample}</code>
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {type === 'installation' && content && (
+            <div className={styles.installationContent}>
+              <p className={styles.mainText}>{content.mainText}</p>
+              {content.installation && (
+                <div className={styles.installationBlock}>
+                  <h4>{content.installation.command}</h4>
+                  <p>{content.installation.description}</p>
+                </div>
+              )}
+              {content.imports && (
+                <div className={styles.importsBlock}>
+                  <h4>{content.imports.title}</h4>
+                  <p>{content.imports.description}</p>
+                </div>
+              )}
+              {codeExample && (
+                <div className={styles.codeSection}>
+                  <div className={styles.codeHeader}>
+                    <span className={styles.codeTitle}>Contract Structure</span>
+                    <button 
+                      className={styles.copyButton}
+                      onClick={() => copyToClipboard(codeExample)}
+                      title="Copy code"
+                    >
+                      {copiedCode === codeExample ? '✓' : '📋'}
+                    </button>
+                  </div>
+                  <pre className={styles.codeBlock}>
+                    <code className={styles.code}>{codeExample}</code>
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {type === 'code-heavy' && content && (
+            <div className={styles.codeHeavyContent}>
+              <p className={styles.overview}>{content.overview}</p>
+              {content.keyFeatures && (
+                <ul className={styles.keyFeatures}>
+                  {content.keyFeatures.map((feature, index) => (
+                    <li key={index} className={styles.keyFeature}>{feature}</li>
+                  ))}
+                </ul>
+              )}
+              {codeExample && (
+                <div className={styles.codeSection}>
+                  <div className={styles.codeHeader}>
+                    <span className={styles.codeTitle}>Function Implementation</span>
+                    <button 
+                      className={styles.copyButton}
+                      onClick={() => copyToClipboard(codeExample)}
+                      title="Copy code"
+                    >
+                      {copiedCode === codeExample ? '✓' : '📋'}
+                    </button>
+                  </div>
+                  <pre className={styles.codeBlock}>
+                    <code className={styles.code}>{codeExample}</code>
+                  </pre>
+                </div>
+              )}
+              {functions && (
+                <div className={styles.functionsList}>
+                  <h4>Key Functions:</h4>
+                  {functions.map((func, index) => (
+                    <div key={index} className={styles.functionItem}>
+                      <h5>{func.name}</h5>
+                      <p>{func.description}</p>
+                      <small>{func.purpose}</small>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {type === 'integration' && content && (
+            <div className={styles.integrationContent}>
+              <p className={styles.mainText}>{content.mainText}</p>
+              {content.setup && (
+                <div className={styles.setupBlock}>
+                  <h4>{content.setup.title}</h4>
+                  <p>{content.setup.description}</p>
+                </div>
+              )}
+              {content.features && (
+                <ul className={styles.featuresList}>
+                  {content.features.map((feature, index) => (
+                    <li key={index} className={styles.feature}>{feature}</li>
+                  ))}
+                </ul>
+              )}
+              {codeExample && (
+                <div className={styles.codeSection}>
+                  <div className={styles.codeHeader}>
+                    <span className={styles.codeTitle}>Frontend Integration</span>
+                    <button 
+                      className={styles.copyButton}
+                      onClick={() => copyToClipboard(codeExample)}
+                      title="Copy code"
+                    >
+                      {copiedCode === codeExample ? '✓' : '📋'}
+                    </button>
+                  </div>
+                  <pre className={styles.codeBlock}>
+                    <code className={styles.code}>{codeExample}</code>
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {type === 'testing' && content && (
+            <div className={styles.testingContent}>
+              <p className={styles.mainText}>{content.mainText}</p>
+              {content.modes && (
+                <div className={styles.modesList}>
+                  {Object.entries(content.modes).map(([key, mode]) => (
+                    <div key={key} className={styles.modeItem}>
+                      <h4>{mode.title}</h4>
+                      <p>{mode.description}</p>
+                      <code className={styles.modeCommand}>{mode.command}</code>
+                      <ul className={styles.modeFeatures}>
+                        {mode.features.map((feature, index) => (
+                          <li key={index}>{feature}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {codeExample && (
+                <div className={styles.codeSection}>
+                  <div className={styles.codeHeader}>
+                    <span className={styles.codeTitle}>Test Example</span>
+                    <button 
+                      className={styles.copyButton}
+                      onClick={() => copyToClipboard(codeExample)}
+                      title="Copy code"
+                    >
+                      {copiedCode === codeExample ? '✓' : '📋'}
+                    </button>
+                  </div>
+                  <pre className={styles.codeBlock}>
+                    <code className={styles.code}>{codeExample}</code>
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {type === 'deployment' && content && (
+            <div className={styles.deploymentContent}>
+              <p className={styles.mainText}>{content.mainText}</p>
+              {content.steps && (
+                <div className={styles.deploymentSteps}>
+                  {content.steps.map((step, index) => (
+                    <div key={index} className={styles.deploymentStep}>
+                      <h4>{step.title}</h4>
+                      <p>{step.description}</p>
+                      {step.command && (
+                        <code className={styles.deploymentCommand}>{step.command}</code>
+                      )}
+                      {step.note && (
+                        <div className={styles.note}>{step.note}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {codeExample && (
+                <div className={styles.codeSection}>
+                  <div className={styles.codeHeader}>
+                    <span className={styles.codeTitle}>Deploy Script</span>
+                    <button 
+                      className={styles.copyButton}
+                      onClick={() => copyToClipboard(codeExample)}
+                      title="Copy code"
+                    >
+                      {copiedCode === codeExample ? '✓' : '📋'}
+                    </button>
+                  </div>
+                  <pre className={styles.codeBlock}>
+                    <code className={styles.code}>{codeExample}</code>
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {type === 'faq' && content && (
+            <div className={styles.faqContent}>
+              <p className={styles.mainText}>{content.mainText}</p>
+              {content.problems && (
+                <div className={styles.problemsList}>
+                  {content.problems.map((problem, index) => (
+                    <div key={index} className={styles.problemItem}>
+                      <h4>{problem.title}</h4>
+                      <p>{problem.description}</p>
+                      <ul className={styles.solutionsList}>
+                        {problem.solutions.map((solution, solIndex) => (
+                          <li key={solIndex} className={styles.solution}>{solution}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {faq && (
+                <div className={styles.faqList}>
+                  <h4>Frequently Asked Questions:</h4>
+                  {faq.map((item, index) => (
+                    <div key={index}>
+                      <h5 className={styles.faqQuestion}>{item.question}</h5>
+                      <p className={styles.faqAnswer}>{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Remove the old code section at the end since we now show code in the middle */}
         </div>
       )}
     </div>

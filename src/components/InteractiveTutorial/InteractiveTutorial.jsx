@@ -1,177 +1,289 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TutorialCard from '../TutorialCard';
 import styles from './InteractiveTutorial.module.scss';
 
 const InteractiveTutorial = () => {
   const [expandedCards, setExpandedCards] = useState(new Set());
+  const [completedCards, setCompletedCards] = useState(new Set());
 
-  const toggleCard = (cardId) => {
-    setExpandedCards(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(cardId)) {
-        newSet.delete(cardId);
-      } else {
-        newSet.add(cardId);
-      }
-      return newSet;
-    });
+  // Function to generate appropriate icons based on card type and content
+  const generateIcon = (card) => {
+    const iconMap = {
+      'concept': '🧠',
+      'setup': '⚙️',
+      'installation': '📦',
+      'code-heavy': '💻',
+      'integration': '🔗',
+      'deployment': '🚀',
+      'faq': '❓'
+    };
+    
+    // Special cases based on card ID or title
+    const specialIcons = {
+      'intro': '🔐', // FHEVM concept
+      'libraries': '📚', // Installing libraries
+      'contract': '📝', // Writing contracts
+      'frontend': '⚛️', // React integration
+      'deployment': '🌐', // Production deployment
+      'faq': '🛠️' // Troubleshooting
+    };
+    
+    const icon = specialIcons[card.id] || iconMap[card.type] || '📋';
+    console.log(`Card ${card.id} (${card.type}) -> Icon: ${icon}`);
+    return icon;
   };
 
   const tutorialCards = [
     {
+      id: 'intro',
+      title: 'What is FHEVM?',
+      description: 'Understanding Fully Homomorphic Encryption in Blockchain',
+      type: 'concept',
+      content: {
+        mainText: `Fully homomorphic encryption (FHE) lets smart contracts process data while it stays encrypted. In other words, computations can be performed on ciphertexts so that only the result (when decrypted) reveals the correct answer, without revealing the inputs.`,
+        keyPoints: [
+          '🔒 Data remains encrypted even during computations',
+          '⚡ Solves blockchain\'s privacy problem',
+          '🌐 All data on public ledger is visible by default',
+          '🛡️ FHE keeps user data confidential during on-chain computation'
+        ],
+        highlight: 'This "holy grail" of cryptography solves blockchain\'s privacy problem!',
+        imageExample: {
+          src: '/image.avif',
+          alt: 'FHEVM Architecture Diagram',
+          caption: 'FHEVM enables computation on encrypted data while preserving privacy'
+        }
+      }
+    },
+    {
       id: 'setup',
-      title: 'Project Setup & Installation',
-      description: 'Get started with FHEVM Wordle development environment',
-      icon: 'rocket',
+      title: 'Environment Setup',
+      description: 'Installing Node.js, Hardhat and React for development',
+      type: 'setup',
       steps: [
         {
-          title: 'Clone the Repository',
-          description: 'Start by cloning the FHEVM Wordle repository to your local machine.',
-          command: 'git clone https://github.com/your-username/FHEVMWordle.git',
+          title: 'Install Node.js',
+          description: 'Begin by installing a supported Node.js LTS version',
+          command: 'node --version',
           details: [
-            'Navigate to your desired development directory',
-            'Ensure you have Git installed on your system',
-            'Use HTTPS or SSH based on your GitHub configuration'
+            'Use even-numbered version (e.g. v18 or v20)',
+            'Check compatibility with your system',
+            'Ensure npm is also installed'
           ]
         },
         {
-          title: 'Install Dependencies',
-          description: 'Install all required Node.js packages and dependencies.',
-          command: 'npm install',
+          title: 'Initialize Project',
+          description: 'Create a new project folder and initialize it',
+          command: 'npm init',
           details: [
-            'This will install React, Ethers.js, Web3Modal, and other dependencies',
-            'Make sure you have Node.js 18+ installed',
-            'The installation may take a few minutes'
+            'Create a new project folder',
+            'Initialize project with npm init',
+            'Follow instructions to create package.json'
           ]
         },
         {
-          title: 'Verify Installation',
-          description: 'Ensure everything is set up correctly by running the development server.',
-          command: 'npm start',
+          title: 'Install Hardhat and FHEVM',
+          description: 'Install Hardhat and FHEVM plugin',
+          command: 'npm install --save-dev hardhat @fhevm/hardhat-plugin',
           details: [
-            'The app should open in your browser at http://localhost:3000',
-            'You should see the FHEVM Wordle interface',
-            'Check the browser console for any errors'
+            'Hardhat - Ethereum development environment',
+            '@fhevm/hardhat-plugin - plugin for FHEVM support',
+            'These tools are essential for FHEVM work'
           ]
         }
       ],
       codeExample: `# Complete setup sequence
-git clone https://github.com/your-username/FHEVMWordle.git
-cd FHEVMWordle
-npm install
-npm start
+npm init
+npm install --save-dev hardhat @fhevm/hardhat-plugin
+npx hardhat init
+
+# Create React frontend
+npx create-react-app frontend
+cd frontend
+npm install ethers @zama-fhe/relayer-sdk
 
 # Verify installation
 npm run build
 npm test`
     },
     {
-      id: 'fhevm',
-      title: 'FHEVM Integration',
-      description: 'Learn how to integrate Zama AI FHEVM technology',
-      icon: 'shield',
-      steps: [
-        {
-          title: 'Install FHEVM Dependencies',
-          description: 'Add FHEVM and TFHE libraries to your project.',
-          command: 'npm install fhevm @zama-ai/fhevm',
-          details: [
-            'FHEVM provides the core homomorphic encryption functionality',
-            'TFHE library handles encrypted data types',
-            'These are essential for privacy-preserving computations'
-          ]
+      id: 'libraries',
+      title: 'Installing FHEVM Libraries',
+      description: 'Connecting Zama Solidity libraries and TFHE functions',
+      type: 'installation',
+      content: {
+        mainText: 'Our contracts will use the Zama Solidity library and TFHE functions. Install the required dependencies:',
+        installation: {
+          command: 'npm install @fhevm/solidity',
+          description: 'This provides Solidity contracts like FHE.sol and network configs.'
         },
-        {
-          title: 'Configure FHEVM Environment',
-          description: 'Set up the FHEVM development environment.',
-          command: 'npx fhevm init',
-          details: [
-            'This initializes FHEVM configuration files',
-            'Creates necessary directories and setup files',
-            'Configures the development environment for FHE operations'
-          ]
-        },
-        {
-          title: 'Import FHEVM in Smart Contracts',
-          description: 'Add FHEVM imports to your Solidity contracts.',
-          command: 'import "fhevm/lib/TFHE.sol";',
-          details: [
-            'Import TFHE library for encrypted data types',
-            'Use euint8, euint16, etc. for encrypted integers',
-            'Enable homomorphic operations on encrypted data'
-          ]
+        imports: {
+          title: 'Imports in Solidity contracts',
+          description: 'In your Solidity contract files, import the FHE library and network configuration:'
         }
-      ],
-      codeExample: `// contracts/FHEVMWordle.sol
-import "fhevm/lib/TFHE.sol";
+      },
+      codeExample: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+import { FHE, euint8, euint32, externalEuint8 } from "@fhevm/solidity/lib/FHE.sol";
+import { SepoliaConfig } from "@fhevm/solidity/config/ZamaConfig.sol";
 
-contract FHEVMWordle {
-    using TFHE for euint8;
+contract FHEWordle is SepoliaConfig {
+    // Encrypted state (private word & mask)
+    euint8[5] private secretLetters;  // five encrypted letters
+    euint32 private secretMask;        // 26-bit mask of used letters
     
-    // Encrypted secret word
-    mapping(address => euint8[5]) private encryptedSecretWords;
+    // Public state
+    bool public wordSet;
+    bool public gameStarted;
+    uint8 public nGuesses;
     
-    function setSecretWord(euint8[5] memory encryptedWord) public {
-        encryptedSecretWords[msg.sender] = encryptedWord;
-    }
+    // Store plaintext guesses and Merkle proofs for validity
+    uint32[5] public guesses;
+    bytes32 constant public rootAllowed = 0xABC...; // Merkle root of valid words
     
-    function processGuess(euint8[5] memory guess) public view returns (euint8[5]) {
-        // Homomorphic comparison
-        return TFHE.cmux(
-            TFHE.eq(guess[0], encryptedSecretWords[msg.sender][0]),
-            guess,
-            encryptedSecretWords[msg.sender]
-        );
-    }
+    // Event emitted when a guess is evaluated and decrypted
+    event GuessEvaluated(uint8 indexed guessIndex, uint8 eqMask, uint32 letterMask);
 }`
     },
     {
-      id: 'contracts',
-      title: 'Smart Contract Development',
-      description: 'Build and deploy FHEVM-enabled smart contracts',
-      icon: 'code',
-      steps: [
+      id: 'contract',
+      title: 'Writing Smart Contract',
+      description: 'Creating game logic using FHEVM',
+      type: 'code-heavy',
+      content: {
+        overview: 'Below is a simplified structure of our Wordle contract. We use euint8 for each secret letter (0–25 for a–z) and euint32 for a 26-bit mask.',
+        keyFeatures: [
+          '🔐 Private state stays encrypted',
+          '📊 Public state or events reveal only allowed info',
+          '🎯 Using masks for efficient letter checking',
+          '⚡ Avoiding loops in encrypted logic'
+        ]
+      },
+      functions: [
         {
-          title: 'Create FHEVM Contract',
-          description: 'Build a new Solidity contract with FHEVM integration.',
-          command: 'touch contracts/FHEVMWordle.sol',
-          details: [
-            'Create a new Solidity file in the contracts directory',
-            'Import necessary FHEVM libraries',
-            'Define the contract structure with encrypted data types'
-          ]
+          name: 'submitWord',
+          description: 'Function for setting secret word (relayer only)',
+          purpose: 'Allows privileged actor to encrypt and submit target word'
         },
         {
-          title: 'Implement Game Logic',
-          description: 'Add encrypted game logic to your contract.',
-          command: '// Add game functions with FHE operations',
-          details: [
-            'Create functions for starting games with encrypted words',
-            'Implement guess processing using homomorphic operations',
-            'Add result calculation without decryption'
-          ]
+          name: 'guessWord',
+          description: 'Function for recording player guess',
+          purpose: 'Players submit guesses in plaintext with Merkle proof'
         },
         {
-          title: 'Deploy to Testnet',
-          description: 'Deploy your contract to Ethereum Sepolia testnet.',
-          command: 'npx hardhat run scripts/deploy.js --network sepolia',
-          details: [
-            'Ensure you have Sepolia ETH for gas fees',
-            'Configure Hardhat for Sepolia network',
-            'Verify contract deployment on Etherscan'
-          ]
+          name: 'evaluateGuess',
+          description: 'Function for evaluating guess',
+          purpose: 'Computes feedback without revealing secret'
         }
       ],
+      codeExample: `function submitWord(euint8 l0, euint8 l1, euint8 l2, euint8 l3, euint8 l4) external onlyRelayer {
+    require(!wordSet, "word already set");
+    secretLetters[0] = l0;
+    secretLetters[1] = l1;
+    secretLetters[2] = l2;
+    secretLetters[3] = l3;
+    secretLetters[4] = l4;
+    
+    // Build a mask: for each letter l, set bit 1<<l
+    secretMask = 
+        TFHE.or(
+            TFHE.shl(TFHE.asEuint32(1), secretLetters[0]),
+            TFHE.or(
+                TFHE.shl(TFHE.asEuint32(1), secretLetters[1]),
+                TFHE.or(
+                    TFHE.shl(TFHE.asEuint32(1), secretLetters[2]),
+                    TFHE.or(
+                        TFHE.shl(TFHE.asEuint32(1), secretLetters[3]),
+                        TFHE.shl(TFHE.asEuint32(1), secretLetters[4])
+                    )
+                )
+            )
+        );
+    wordSet = true;
+    gameStarted = true;
+}`
+    },
+    {
+      id: 'frontend',
+      title: 'Frontend Integration',
+      description: 'Connecting React frontend to FHEVM smart contracts',
+      type: 'integration',
+      content: {
+        mainText: 'In the React app, use ethers and Zama\'s Relayer SDK to interact:',
+        setup: {
+          title: 'Contract Setup',
+          description: 'Create a function to set up contract connection'
+        },
+        features: [
+          '🔗 Connect to wallet via MetaMask',
+          '🔐 Encrypt input data using Relayer SDK',
+          '📡 Send encrypted transactions',
+          '👂 Listen to events for results'
+        ]
+      },
+      codeExample: `import { ethers } from 'ethers';
+import { FhevmRelayerProvider } from '@zama-fhe/relayer-sdk';
+import FHEWordleABI from './artifacts/FHEWordle.json';
+
+async function setupContract() {
+  await window.ethereum.request({ method: 'eth_requestAccounts' });
+  const provider = new ethers.providers.Web3Provider(window.ethereum);
+  const signer = provider.getSigner();
+  
+  // RelayerProvider wraps signer to handle FHE inputs
+  const relayer = new FhevmRelayerProvider(provider);
+  const contractAddress = "<DEPLOYED_CONTRACT_ADDRESS>";
+  const wordle = new ethers.Contract(contractAddress, FHEWordleABI, relayer);
+  return wordle;
+}
+
+// Submit encrypted word
+const letters = [16, 20, 8, 2, 10]; // "quick"
+const input = await relayer.createEncryptedInput(wordle.address, await signer.getAddress());
+letters.forEach(num => input.add8(num));
+const { handles, inputProof } = await input.encrypt();
+
+const tx = await wordle.submitWord(
+  handles[0], handles[1], handles[2], handles[3], handles[4],
+  inputProof
+);
+await tx.wait();`
+    },
+    {
+      id: 'deployment',
+      title: 'Production Deployment',
+      description: 'Deploying your FHEVM application to production',
+      type: 'deployment',
+      content: {
+        mainText: 'To deploy the project, use a script or Hardhat task.',
+      steps: [
+        {
+            title: 'Network Setup',
+            description: 'Ensure hardhat.config.js is configured for Sepolia',
+            command: 'npx hardhat run scripts/deploy.js --network sepolia'
+          },
+          {
+            title: 'Get Contract',
+            description: 'Script typically prints the contract address',
+            note: 'Save the address for use in frontend'
+          },
+          {
+            title: 'Verify Deployment',
+            description: 'Verify contract on Etherscan',
+            command: 'npx hardhat verify --network sepolia <CONTRACT_ADDRESS>'
+          }
+        ]
+      },
       codeExample: `// scripts/deploy.js
 const { ethers } = require("hardhat");
 
 async function main() {
-  const FHEVMWordle = await ethers.getContractFactory("FHEVMWordle");
-  const fhevmWordle = await FHEVMWordle.deploy();
+  const FHEWordle = await ethers.getContractFactory("FHEWordle");
+  const wordle = await FHEWordle.deploy();
   
-  await fhevmWordle.waitForDeployment();
+  await wordle.waitForDeployment();
   
-  console.log("FHEVMWordle deployed to:", await fhevmWordle.getAddress());
+  console.log("FHEWordle deployed to:", await wordle.getAddress());
 }
 
 main().catch((error) => {
@@ -180,232 +292,117 @@ main().catch((error) => {
 });`
     },
     {
-      id: 'frontend',
-      title: 'Frontend Integration',
-      description: 'Connect React frontend with FHEVM smart contracts',
-      icon: 'gear',
-      steps: [
-        {
-          title: 'Setup Web3 Connection',
-          description: 'Configure Web3Modal for wallet connection.',
-          command: 'npm install web3modal ethers',
-          details: [
-            'Web3Modal provides easy wallet connection UI',
-            'Ethers.js handles blockchain interactions',
-            'Configure for multiple wallet support'
-          ]
-        },
-        {
-          title: 'Create FHEVM Hook',
-          description: 'Build a custom hook for FHEVM operations.',
-          command: '// Create useFHEVM.js hook',
-          details: [
-            'Handle encrypted data operations',
-            'Manage FHEVM contract interactions',
-            'Provide easy-to-use interface for components'
-          ]
-        },
-        {
-          title: 'Integrate with Game Components',
-          description: 'Connect FHEVM functionality to React components.',
-          command: '// Update game components',
-          details: [
-            'Modify game logic to use encrypted operations',
-            'Update UI to handle encrypted data',
-            'Add loading states for FHE operations'
-          ]
-        }
-      ],
-      codeExample: `// hooks/useFHEVM.js
-import { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
-
-export const useFHEVM = (contract, account) => {
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const submitEncryptedGuess = async (encryptedGuess) => {
-    setIsLoading(true);
-    try {
-      const tx = await contract.submitGuess(encryptedGuess);
-      await tx.wait();
-      return tx;
-    } catch (error) {
-      console.error('FHEVM operation failed:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  return { submitEncryptedGuess, isLoading };
-};`
-    },
-    {
-      id: 'testing',
-      title: 'Testing & Debugging',
-      description: 'Test FHEVM functionality and debug issues',
-      icon: 'terminal',
-      steps: [
-        {
-          title: 'Write FHEVM Tests',
-          description: 'Create comprehensive tests for FHEVM operations.',
-          command: 'npx hardhat test test/FHEVMWordle.test.js',
-          details: [
-            'Test encrypted data operations',
-            'Verify homomorphic computations',
-            'Check contract deployment and interaction'
-          ]
-        },
-        {
-          title: 'Debug FHEVM Issues',
-          description: 'Troubleshoot common FHEVM development problems.',
-          command: '// Add debugging logs',
-          details: [
-            'Use console.log for encrypted data inspection',
-            'Check FHEVM configuration and setup',
-            'Verify network connectivity and gas limits'
-          ]
-        },
-        {
-          title: 'Performance Optimization',
-          description: 'Optimize FHEVM operations for better performance.',
-          command: '// Optimize gas usage and computation',
-          details: [
-            'Minimize FHE operations where possible',
-            'Use efficient data structures',
-            'Implement proper error handling'
-          ]
-        }
-      ],
-      codeExample: `// test/FHEVMWordle.test.js
-const { expect } = require('chai');
-const { ethers } = require('hardhat');
-
-describe('FHEVMWordle', function () {
-  it('Should process encrypted guess correctly', async function () {
-    const FHEVMWordle = await ethers.getContractFactory('FHEVMWordle');
-    const fhevmWordle = await FHEVMWordle.deploy();
-    
-    // Test encrypted operations
-    const encryptedWord = [1, 2, 3, 4, 5]; // Example encrypted data
-    await fhevmWordle.setSecretWord(encryptedWord);
-    
-    const result = await fhevmWordle.processGuess(encryptedWord);
-    expect(result).to.not.be.undefined;
-  });
-});`
-    },
-    {
-      id: 'deployment',
-      title: 'Production Deployment',
-      description: 'Deploy your FHEVM application to production',
-      icon: 'rocket',
-      steps: [
-        {
-          title: 'Prepare for Production',
-          description: 'Optimize your application for production deployment.',
-          command: 'npm run build',
-          details: [
-            'Create optimized production build',
-            'Minimize bundle size and optimize assets',
-            'Test production build locally'
-          ]
-        },
-        {
-          title: 'Deploy Smart Contracts',
-          description: 'Deploy FHEVM contracts to mainnet.',
-          command: 'npx hardhat run scripts/deploy.js --network mainnet',
-          details: [
-            'Ensure you have sufficient ETH for gas fees',
-            'Verify contracts on Etherscan',
-            'Update frontend with new contract addresses'
-          ]
-        },
-        {
-          title: 'Deploy Frontend',
-          description: 'Deploy React frontend to hosting platform.',
-          command: 'npm run build && deploy-to-platform',
-          details: [
-            'Use platforms like Vercel, Netlify, or AWS',
-            'Configure environment variables',
-            'Set up custom domain if needed'
-          ]
-        }
-      ],
-      codeExample: `# Production deployment script
-#!/bin/bash
-
-# Build the application
-npm run build
-
-# Deploy contracts to mainnet
-npx hardhat run scripts/deploy.js --network mainnet
-
-# Deploy frontend to Vercel
-vercel --prod
-
-echo "Deployment complete!"`
-    },
-    {
-      id: 'troubleshooting',
-      title: 'Troubleshooting & FAQ',
+      id: 'faq',
+      title: 'FAQ & Troubleshooting',
       description: 'Common issues and solutions for FHEVM development',
-      icon: 'gear',
-      steps: [
+      type: 'faq',
+      content: {
+        mainText: 'Here are solutions for the most common problems when working with FHEVM:',
+        problems: [
+          {
+            title: '🔗 Wallet/Network Issues',
+            description: 'Make sure MetaMask is connected to the same network as the contract',
+            solutions: [
+              'For local testing use localhost:8545',
+              'For real FHE use Sepolia',
+              'Wrong chainId will cause transactions to fail'
+            ]
+          },
+          {
+            title: '⏱️ Long Decryption Delays',
+            description: 'In Sepolia mode, oracle callbacks can take several minutes',
+            solutions: [
+              'Be patient after each guess',
+              'Check event logs or GuessEvaluated event',
+              'Don\'t rely on immediate return values'
+            ]
+          },
+          {
+            title: '💥 Smart Contract Reverts',
+            description: 'Common gotchas include forgotten roles or mismatched parameter types',
+            solutions: [
+              'Check only onlyRelayer or onlyPlayer roles',
+              'For encrypted inputs, ensure you pass correct proof',
+              'Use Hardhat console logs or events for debugging'
+            ]
+          },
+          {
+            title: '🔄 Hardhat Mode vs Sepolia',
+            description: 'If code works in Hardhat but not on Sepolia',
+            solutions: [
+              'Check that you added SepoliaConfig and imported FHE.sol',
+              'Ensure you set Infura API key and mnemonic',
+              'Hardhat mock mode doesn\'t catch network config issues'
+            ]
+          }
+        ]
+      },
+      faq: [
         {
-          title: 'FHEVM Connection Issues',
-          description: 'Resolve common FHEVM connection problems.',
-          command: '// Check FHEVM configuration',
-          details: [
-            'Verify FHEVM is properly initialized',
-            'Check network connectivity',
-            'Ensure correct RPC endpoints are configured'
-          ]
+          question: 'How do I deploy this project?',
+          answer: 'Use a script or Hardhat task to deploy. For example: npx hardhat run scripts/deploy.js --network sepolia'
         },
         {
-          title: 'Gas Limit Issues',
-          description: 'Handle high gas costs for FHE operations.',
-          command: '// Optimize gas usage',
-          details: [
-            'FHE operations are computationally expensive',
-            'Consider batching operations',
-            'Use appropriate gas limits for transactions'
-          ]
-        },
-        {
-          title: 'Encryption/Decryption Errors',
-          description: 'Fix common encryption-related issues.',
-          command: '// Debug encryption operations',
-          details: [
-            'Verify data format before encryption',
-            'Check key management and storage',
-            'Ensure proper error handling'
-          ]
+          question: 'How to switch contract to production mode?',
+          answer: 'When deploying on Sepolia, ensure hardhat.config.js sets chainId: 11155111 and uses SepoliaConfig.'
         }
-      ],
-      codeExample: `// Common troubleshooting patterns
-try {
-  const result = await contract.processEncryptedGuess(encryptedData);
-  console.log('Operation successful:', result);
-} catch (error) {
-  if (error.message.includes('gas')) {
-    console.log('Gas limit exceeded, try increasing gas');
-  } else if (error.message.includes('encryption')) {
-    console.log('Encryption error, check data format');
-  } else {
-    console.log('Unknown error:', error);
-  }
-}`
+      ]
     }
   ];
+
+  const toggleCard = (cardId) => {
+    setExpandedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId);
+      } else {
+        newSet.add(cardId);
+        // Mark card as completed when expanded
+        setCompletedCards(prevCompleted => {
+          const newCompleted = new Set(prevCompleted);
+          newCompleted.add(cardId);
+          return newCompleted;
+        });
+      }
+      return newSet;
+    });
+  };
+
+  // Calculate progress percentage
+  const progressPercentage = (completedCards.size / tutorialCards.length) * 100;
 
   return (
     <div className={styles.tutorialContainer}>
       <div className={styles.tutorialContent}>
-        <h1 className={styles.title}>FHEVM Wordle - Interactive Developer Tutorial</h1>
+        {/* Header with progress and controls */}
+        <div className={styles.header}>
+          <div className={styles.headerTop}>
+            <h1 className={styles.title}>FHEVM Wordle - Interactive Developer Tutorial</h1>
+          </div>
+          
         <p className={styles.subtitle}>
           Learn how to build privacy-preserving applications with Zama AI's FHEVM technology. 
           Click on any card below to see detailed step-by-step instructions.
         </p>
+
+          {/* Progress Bar */}
+          <div className={styles.progressSection}>
+            <div className={styles.progressInfo}>
+              <span className={styles.progressText}>
+                Progress: {completedCards.size}/{tutorialCards.length} cards completed
+              </span>
+              <span className={styles.progressPercentage}>
+                {Math.round(progressPercentage)}%
+              </span>
+            </div>
+            <div className={styles.progressBar}>
+              <div 
+                className={styles.progressFill}
+                style={{ width: `${progressPercentage}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
         
         
         <div className={styles.cardsGrid}>
@@ -413,7 +410,9 @@ try {
             <TutorialCard
               key={card.id}
               {...card}
+              icon={generateIcon(card)}
               isExpanded={expandedCards.has(card.id)}
+              isCompleted={completedCards.has(card.id)}
               onToggle={toggleCard}
             />
           ))}
@@ -425,10 +424,10 @@ try {
             Once you've completed these tutorials, you'll be ready to:
           </p>
           <ul>
-            <li>Build your own FHEVM applications</li>
-            <li>Contribute to the FHEVM Wordle project</li>
-            <li>Join the Zama AI developer community</li>
-            <li>Deploy production-ready privacy-preserving dApps</li>
+            <li>🚀 Build your own FHEVM applications</li>
+            <li>🤝 Contribute to the FHEVM Wordle project</li>
+            <li>👥 Join the Zama AI developer community</li>
+            <li>🌐 Deploy production-ready privacy-preserving dApps</li>
           </ul>
         </div>
       </div>
