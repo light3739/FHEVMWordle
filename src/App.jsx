@@ -39,22 +39,39 @@ import 'styles/_transitionStyles.scss';
 // Контракт константы
 const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || '0x...';
 const CONTRACT_ABI = [
+  // === MAIN GAME FUNCTIONS ===
   'function startGame(bytes32 sessionHash)',
   'function submitGuess(uint8[5] guess)',
   'function requestDecryptResults()',
-  'function getLastGuessResults() view returns (uint8[5])',
-  'event GuessEvaluated(address indexed player, uint8 attemptNumber, uint8[5] results)',
-  'event WordIndexChosen(address indexed player, uint32 index)',
+  
+  // === SECRET SETTING ===
   'function setEncryptedSecretWord(address player, uint32 index, bytes[] encryptedLetters, bytes inputProof, bytes32[] merkleProof, bytes32 leaf)',
+  
+  // ✅ ИСПРАВЛЕННАЯ СТРУКТУРА games() - ТОЧНО ПО КОНТРАКТУ:
   'function games(address) view returns (uint256 gameId, address player, uint8 currentAttempt, uint8 status, uint256 startTime, uint256 endTime, bytes32 sessionHash, uint256 wordIndex, bool canRecover, uint256 pendingRequestId, bool secretSet)',
-  'function owner() view returns (address)',
-  'function merkleRoot() view returns (bytes32)',
-  'function merkleLeaves() view returns (uint32)',
+  
+  // === PAUSE MANAGEMENT ===
   'function pauseMyGame()',
   'function unpauseMyGame()',
   'function isPlayerPaused(address player) view returns (bool)',
   'function forfeitGame()',
+  
+  // === VIEW FUNCTIONS ===
+  'function merkleRoot() view returns (bytes32)',
+  'function merkleLeaves() view returns (uint32)',
+  'function owner() view returns (address)',
+  
+  // === EVENTS ===
+  'event GameStarted(address indexed player, uint256 indexed gameId, bytes32 sessionHash, uint256 timestamp, uint256 wordIndex)',
+  'event GuessSubmitted(address indexed player, uint256 indexed gameId, uint8 attemptNumber, uint256 timestamp)',
+  'event GameCompleted(address indexed player, uint256 indexed gameId, uint8 finalStatus, uint8 totalAttempts, uint256 duration, bool isWin)',
+  'event GuessEvaluated(address indexed player, uint8 attemptNumber, uint8[5] results)',
+  'event SecretWordSet(address indexed by, address indexed player, uint256 indexed wordIndex)',
+  'event PlayerPaused(address indexed player)',
+  'event PlayerUnpaused(address indexed player)',
+  'event WordIndexChosen(address indexed player, uint32 index)',
 ];
+
 
 const RPC_SEPOLIA = process.env.REACT_APP_RPC_SEPOLIA;
 const FHE_KMS = process.env.REACT_APP_FHEVM_KMS;
