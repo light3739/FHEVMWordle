@@ -15,6 +15,11 @@ import useLocalStorage from 'hooks/useLocalStorage';
 import useAlert from 'hooks/useAlert';
 import { getUniversalConnector } from 'hooks/useWallet';
 import { BrowserProvider, Contract, ethers } from 'ethers';
+import {
+  initSDK,
+  createInstance,
+  SepoliaConfig,
+} from '@zama-fhe/relayer-sdk/bundle';
 
 import {
   solution,
@@ -37,12 +42,324 @@ const CONTRACT_ABI = [
   'function startGame(bytes32 sessionHash)',
   'function submitGuess(uint8[5] guess)',
   'function requestDecryptResults()',
-  'function getGameState(bytes32 sessionHash) view returns (bool exists, bool canRecover, uint256 gameId, uint8 status, uint8 currentAttempt, uint256 startTime, uint256 timeRemaining, bool hasExpired)',
   'function getLastGuessResults() view returns (uint8[5])',
   'event GuessEvaluated(address indexed player, uint8 attemptNumber, uint8[5] results)',
+  'event WordIndexChosen(address indexed player, uint32 index)',
+  'function setEncryptedSecretWord(address player, uint32 index, bytes[] encryptedLetters, bytes inputProof, bytes32[] merkleProof, bytes32 leaf)',
+  'function games(address) view returns (uint256 gameId,address player,uint8 status,uint8 currentAttempt,uint256 startTime,uint256 GAME_TIMEOUT,bytes32 sessionHash,uint256 wordIndex,bool canRecover,uint256 pendingRequestId,bool secretSet)',
+  'function owner() view returns (address)',
+  'function merkleRoot() view returns (bytes32)',
+  'function merkleLeaves() view returns (uint32)',
+  'function pauseMyGame()',
+  'function unpauseMyGame()',
+  'function isPlayerPaused(address player) view returns (bool)',
+  'function forfeitGame()',
 ];
 
+const RPC_SEPOLIA = process.env.REACT_APP_RPC_SEPOLIA;
+const FHE_KMS = process.env.REACT_APP_FHEVM_KMS;
+const FHE_ACL = process.env.REACT_APP_FHEVM_ACL;
+const FHE_RELAYER = process.env.REACT_APP_FHEVM_RELAYER;
+const OWNER_ADDRESS = (process.env.REACT_APP_OWNER_ADDRESS || '').toLowerCase();
+
 function App() {
+  const [isSettingSecret, setIsSettingSecret] = useState(false);
+  const [wordsMeta, setWordsMeta] = useState(null);
+  const [isSecretReady, setIsSecretReady] = useState(false);
+  const [fheInstance, setFheInstance] = useState(null);
+  const [universalConnector, setUniversalConnector] = useState();
+  const [session, setSession] = useState(() => {
+    try {
+      const stored = localStorage.getItem('walletSession');
+      return stored ? JSON.parse(stored) : undefined;
+    } catch {
+      return undefined;
+    }
+  });
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [savedGameInfo, setSavedGameInfo] = useState(null);
+  const [isCheckingForSavedGame, setIsCheckingForSavedGame] = useState(false);
+  const { showAlert } = useAlert();
+
+  useEffect(() => {
+    const init = async () => {
+      if (session && !fheInstance) {
+        try {
+          showAlert('Initializing FHE engine...', 'info');
+
+          // Ждем загрузки CDN
+          let attempts = 0;
+          while (!window.relayerSDK && attempts < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+          }
+
+          if (!window.relayerSDK) {
+            console.warn('CDN not loaded, trying direct import...');
+          }
+
+          // Точно по документации
+          await initSDK(); // Load needed WASM
+          const config = { ...SepoliaConfig, network: window.ethereum };
+          const instance = await createInstance(config);
+
+          setFheInstance(instance);
+          showAlert('FHE engine ready!', 'success');
+          console.log('FHE instance created:', instance);
+        } catch (e) {
+          console.error('Failed to initialize FHE:', e);
+          showAlert('Failed to initialize FHE engine: ' + e.message, 'error');
+        }
+      }
+    };
+
+    init();
+  }, [session, fheInstance, showAlert]);
+  async function testMerkleOnly() {
+    try {
+      const provider = await universalConnector.connect();
+      const ethersProvider = new BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+      const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+      const playerAddress = session.address;
+      const gameState = await contract.games(playerAddress);
+      const actualIndex = parseInt(gameState.wordIndex.toString());
+      const item = wordsMeta.items[actualIndex];
+
+      console.log('=== TESTING MERKLE VERIFICATION DIRECTLY ===');
+
+      // Проверим локально если у нас есть ethers utils
+      const merkleRoot = await contract.merkleRoot();
+      console.log('Contract root:', merkleRoot);
+      console.log('Item leaf:', item.leaf);
+      console.log('Item proof length:', item.proof.length);
+      console.log('Item proof:', item.proof);
+
+      // Попробуем статический вызов с минимальными данными
+      const testCalldata = contract.interface.encodeFunctionData(
+        'setEncryptedSecretWord',
+        [
+          playerAddress,
+          actualIndex,
+          '0x' + '00'.repeat(32), // l0
+          '0x' + '00'.repeat(32), // l1
+          '0x' + '00'.repeat(32), // l2
+          '0x' + '00'.repeat(32), // l3
+          '0x' + '00'.repeat(32), // l4
+          '0x00', // минимальный inputProof
+          item.proof,
+          item.leaf,
+        ]
+      );
+
+      console.log('Generated calldata length:', testCalldata.length);
+      console.log('Generated calldata:', testCalldata);
+
+      // Попробуем через низкоуровневый call
+      try {
+        await ethersProvider.call({
+          to: CONTRACT_ADDRESS,
+          data: testCalldata,
+          from: playerAddress,
+        });
+        console.log('✅ LOW LEVEL CALL PASSED');
+      } catch (lowLevelError) {
+        console.error('❌ Low level call failed:', lowLevelError);
+
+        // Попробуем с другим листом (индекс 0)
+        const item0 = wordsMeta.items[0];
+        const testCalldata0 = contract.interface.encodeFunctionData(
+          'setEncryptedSecretWord',
+          [
+            playerAddress,
+            0, // ИНДЕКС 0
+            '0x' + '00'.repeat(32),
+            '0x' + '00'.repeat(32),
+            '0x' + '00'.repeat(32),
+            '0x' + '00'.repeat(32),
+            '0x' + '00'.repeat(32),
+            '0x00',
+            item0.proof,
+            item0.leaf,
+          ]
+        );
+
+        try {
+          await ethersProvider.call({
+            to: CONTRACT_ADDRESS,
+            data: testCalldata0,
+            from: playerAddress,
+          });
+          console.log('✅ INDEX 0 LOW LEVEL CALL PASSED');
+          showAlert(
+            'Index 0 works, current index has wrong merkle data!',
+            'warning'
+          );
+        } catch (index0Error) {
+          console.error('❌ Even index 0 low level call failed:', index0Error);
+          showAlert('Complete merkle verification failure', 'error');
+        }
+      }
+    } catch (e) {
+      console.error('testMerkleOnly error:', e);
+    }
+  }
+
+  async function setSecretOnchainForSelf(index) {
+    console.log('=== MERKLE COMPATIBILITY CHECK ===');
+    showAlert('Setting secret with real FHE data...', 'info');
+
+    if (isSettingSecret) return;
+    setIsSettingSecret(true);
+
+    try {
+      // Все проверки
+      if (!session || !universalConnector) {
+        showAlert('Connect wallet first', 'error');
+        return;
+      }
+      if (!fheInstance) {
+        showAlert('FHE engine is not ready yet.', 'error');
+        return;
+      }
+      if (!wordsMeta) {
+        showAlert('Dictionary not loaded', 'error');
+        return;
+      }
+
+      const playerAddress = session.address;
+
+      const provider = await universalConnector.connect();
+      const ethersProvider = new BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+      const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+      // Получаем состояние игры
+      const gameState = await contract.games(playerAddress);
+      if (gameState.gameId.toString() === '0') {
+        showAlert('No active game found. Please start a game first.', 'error');
+        return;
+      }
+
+      // Проверяем, не установлен ли секрет уже
+      if (gameState.secretSet) {
+        showAlert('Secret already set for this game!', 'warning');
+        setIsSecretReady(true);
+        return;
+      }
+
+      const actualIndex = parseInt(gameState.wordIndex.toString());
+      const item = wordsMeta.items[actualIndex];
+
+      console.log('=== ITEM CHECK ===');
+      console.log('actualIndex:', actualIndex);
+      console.log('item.word:', item?.word);
+
+      if (!item) {
+        throw new Error(`Index ${actualIndex} out of range in words.json`);
+      }
+
+      // Проверяем root'ы
+      const contractRoot = await contract.merkleRoot();
+      console.log('Contract root:', contractRoot);
+      console.log('File root:', wordsMeta.root);
+
+      if (contractRoot !== wordsMeta.root) {
+        showAlert('❌ ROOT MISMATCH! Old file cached!', 'error');
+        return;
+      }
+
+      console.log('✅ All basic checks passed');
+
+      // СРАЗУ создаем РЕАЛЬНЫЕ FHE данные
+      const letters = item.word
+        .toUpperCase()
+        .split('')
+        .map(ch => ch.charCodeAt(0) - 64);
+
+      console.log('=== GENERATING REAL FHE DATA ===');
+      console.log('Word:', item.word, 'Letters:', letters);
+
+      const input = fheInstance.createEncryptedInput(
+        CONTRACT_ADDRESS,
+        playerAddress
+      );
+
+      // Добавляем все элементы в ОДИН input batch
+      letters.forEach((letter, index) => {
+        console.log(`Adding letter ${index}: ${letter}`);
+        input.add8(letter);
+      });
+
+      console.log('Input prepared for', letters.length, 'letters');
+
+      const { handles, inputProof } = await input.encrypt();
+
+      // ✅ ПРАВИЛЬНОЕ КОДИРОВАНИЕ:
+      const encodedHandles = handles.map(handle => {
+        // Кодируем каждый handle как externalEuint8 структуру
+        return ethers.AbiCoder.defaultAbiCoder().encode(
+          ['(bytes32)'], // externalEuint8 структура
+          [[handle]] // handle как bytes32
+        );
+      });
+
+      console.log('✅ FHE encryption completed');
+      console.log('Handles count:', handles.length);
+      console.log('Encoded handles count:', encodedHandles.length);
+
+      // ПРЯМОЙ вызов с реальными данными
+      console.log('=== EXECUTING WITH REAL FHE DATA ===');
+
+      try {
+        await contract.setEncryptedSecretWord.staticCall(
+          playerAddress,
+          actualIndex,
+          encodedHandles, // ✅ ИСПОЛЬЗУЕМ encodedHandles
+          inputProof,
+          item.proof,
+          item.leaf,
+          { gasLimit: 5000000 }
+        );
+
+        console.log('✅ StaticCall validation PASSED!');
+        showAlert('Validation passed, sending transaction...', 'info');
+
+        // ✅ ИСПОЛЬЗУЕМ encodedHandles В РЕАЛЬНОЙ ТРАНЗАКЦИИ:
+        const tx = await contract.setEncryptedSecretWord(
+          playerAddress,
+          actualIndex,
+          encodedHandles, // ✅ ИСПОЛЬЗУЕМ encodedHandles
+          inputProof,
+          item.proof,
+          item.leaf,
+          { gasLimit: 8000000 }
+        );
+        console.log('Transaction sent:', tx.hash);
+        showAlert(`Transaction sent: ${tx.hash}`, 'info');
+
+        const receipt = await tx.wait();
+        console.log('Transaction status:', receipt.status);
+
+        if (receipt.status === 1) {
+          showAlert('✅ Secret set successfully!', 'success');
+          setIsSecretReady(true);
+        } else {
+          throw new Error('Transaction failed');
+        }
+      } catch (fheError) {
+        console.error('❌ FHE transaction failed:', fheError);
+        showAlert('Transaction failed: ' + fheError.message, 'error');
+      }
+    } catch (e) {
+      console.error('setSecretOnchainForSelf error:', e);
+      showAlert(e.message || 'Failed to set secret', 'error');
+    } finally {
+      setIsSettingSecret(false);
+    }
+  }
+
   const [blockAutoReconnect, setBlockAutoReconnect] = useState(false);
   const [boardState, setBoardState] = useLocalStorage('boardState', {
     guesses: [],
@@ -91,9 +408,21 @@ function App() {
     'currentSessionHash',
     null
   );
-  const [savedGameInfo, setSavedGameInfo] = useState(null);
-  const [isCheckingForSavedGame, setIsCheckingForSavedGame] = useState(false);
-  const { showAlert } = useAlert();
+
+  // Загрузка словаря words.json
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/dist/words.json');
+        const meta = await res.json();
+        setWordsMeta(meta);
+      } catch (e) {
+        console.error('Failed to load words.json', e);
+        showAlert('Failed to load words.json', 'error');
+      }
+    })();
+  }, [showAlert]);
+
   // Ensure Sepolia network (chainId 11155111)
   const ensureSepolia = async provider => {
     const targetHex = '0xaa36a7';
@@ -110,14 +439,12 @@ function App() {
             {
               chainId: targetHex,
               chainName: 'Sepolia',
-              rpcUrls: [
-                'https://sepolia.infura.io/v3/17d9c7c455364415a1d9186f7774517e',
-              ],
               nativeCurrency: {
                 name: 'SepoliaETH',
                 symbol: 'ETH',
                 decimals: 18,
               },
+              rpcUrls: [RPC_SEPOLIA],
               blockExplorerUrls: ['https://sepolia.etherscan.io'],
             },
           ],
@@ -132,16 +459,6 @@ function App() {
     }
   };
   // Wallet state
-  const [universalConnector, setUniversalConnector] = useState();
-  const [session, setSession] = useState(() => {
-    try {
-      const stored = localStorage.getItem('walletSession');
-      return stored ? JSON.parse(stored) : undefined;
-    } catch {
-      return undefined;
-    }
-  });
-  const [isConnecting, setIsConnecting] = useState(false);
 
   // Open wallet modal if no session; close if session exists
   useEffect(() => {
@@ -201,6 +518,30 @@ function App() {
       }
     })();
   }, [universalConnector, blockAutoReconnect]);
+  const [isPlayerPaused, setIsPlayerPaused] = useState(false);
+  useEffect(() => {
+    const checkPauseStatus = async () => {
+      if (!session || !universalConnector) return;
+
+      try {
+        const provider = await universalConnector.connect();
+        const ethersProvider = new BrowserProvider(provider);
+        const signer = await ethersProvider.getSigner();
+        const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+        const isPaused = await contract.isPlayerPaused(session.address);
+        setIsPlayerPaused(isPaused);
+      } catch (e) {
+        console.error('Failed to check pause status:', e);
+      }
+    };
+
+    if (isGameStarted) {
+      checkPauseStatus();
+      const interval = setInterval(checkPauseStatus, 10000); // Проверяем каждые 10 секунд
+      return () => clearInterval(interval);
+    }
+  }, [session, universalConnector, isGameStarted]);
 
   // Save boardState to localStorage
   useEffect(() => {
@@ -377,12 +718,6 @@ function App() {
       return;
     }
 
-    // Если нет сохранённого sessionHash, значит нет активной игры
-    if (!currentSessionHash) {
-      setSavedGameInfo(null);
-      return;
-    }
-
     setIsCheckingForSavedGame(true);
     try {
       const provider = await universalConnector.connect();
@@ -390,31 +725,30 @@ function App() {
       const signer = await ethersProvider.getSigner();
 
       const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
-      const gameState = await contract.getGameState(currentSessionHash);
-      console.log('Game state:', gameState);
-
-      if (gameState.exists && gameState.canRecover && !gameState.hasExpired) {
-        const currentTime = Math.floor(Date.now() / 1000);
-        const timeElapsed = currentTime - Number(gameState.startTime);
-        const timeRemaining = Number(gameState.timeRemaining);
-
-        let gameAge = '';
-        if (timeElapsed < 60) {
-          gameAge = 'just now';
-        } else if (timeElapsed < 3600) {
-          gameAge = `${Math.floor(timeElapsed / 60)} minutes ago`;
-        } else {
-          gameAge = `${Math.floor(timeElapsed / 3600)} hours ago`;
-        }
-
+      // Новый способ: читаем games(address)
+      const game = await contract.games(session.address);
+      // вычисляем timeRemaining и hasExpired на клиенте
+      const currentTime = Math.floor(Date.now() / 1000);
+      const timeElapsed = currentTime - Number(game.startTime);
+      const timeRemaining = Number(game.GAME_TIMEOUT) - timeElapsed;
+      let gameAge = '';
+      if (timeElapsed < 60) {
+        gameAge = 'just now';
+      } else if (timeElapsed < 3600) {
+        gameAge = `${Math.floor(timeElapsed / 60)} minutes ago`;
+      } else {
+        gameAge = `${Math.floor(timeElapsed / 3600)} hours ago`;
+      }
+      // hasExpired: если timeRemaining <= 0 или game.hasExpired
+      const hasExpired = timeRemaining <= 0 || game.hasExpired;
+      if (game.canRecover && !hasExpired) {
         setSavedGameInfo({
           exists: true,
-          canRecover: gameState.canRecover,
-          currentAttempt: Number(gameState.currentAttempt),
+          canRecover: game.canRecover,
+          currentAttempt: Number(game.currentAttempt),
           gameAge,
           timeRemaining,
-          sessionHash: currentSessionHash,
+          sessionHash: game.sessionHash,
         });
       } else {
         setSavedGameInfo(null);
@@ -443,44 +777,37 @@ function App() {
       const provider = await universalConnector.connect();
       const ethersProvider = new BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
-
       const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
-      // Проверяем актуальное состояние игры
-      const gameState = await contract.getGameState(savedGameInfo.sessionHash);
-
-      if (!gameState.exists || !gameState.canRecover || gameState.hasExpired) {
+      // Новый способ: читаем games(address)
+      const game = await contract.games(session.address);
+      const currentTime = Math.floor(Date.now() / 1000);
+      const timeElapsed = currentTime - Number(game.startTime);
+      const timeRemaining = Number(game.GAME_TIMEOUT) - timeElapsed;
+      const hasExpired = timeRemaining <= 0 || game.hasExpired;
+      if (!game.canRecover || hasExpired) {
         showAlert('Saved game is no longer available', 'error');
         setSavedGameInfo(null);
         return;
       }
-
-      // Восстанавливаем состояние игры
-      const currentAttempt = Number(gameState.currentAttempt);
-
-      // Пытаемся восстановить сохранённые попытки из localStorage
+      const currentAttempt = Number(game.currentAttempt);
+      // Восстанавливаем попытки из localStorage
       let restoredGuesses = [];
       try {
         const savedGuesses = boardState.guesses || [];
         if (savedGuesses.length >= currentAttempt) {
           restoredGuesses = savedGuesses.slice(0, currentAttempt);
         } else {
-          // Дополняем недостающие попытки пустыми строками
           restoredGuesses = [...savedGuesses];
           while (restoredGuesses.length < currentAttempt) {
-            restoredGuesses.push(''); // Пустые слова для неизвестных попыток
+            restoredGuesses.push('');
           }
         }
       } catch {
-        // Если не удалось восстановить, создаем массив пустых попыток
         restoredGuesses = Array(currentAttempt).fill('');
       }
-
-      // Восстанавливаем состояние
       setGuesses(restoredGuesses);
       setIsGameStarted(true);
-      setSavedGameInfo(null); // Очищаем информацию о сохранённой игре
-
+      setSavedGameInfo(null);
       showAlert(
         `Game restored! Continuing from attempt ${currentAttempt + 1}`,
         'success'
@@ -514,6 +841,7 @@ function App() {
       setCurrentSessionHash(null);
       setSavedGameInfo(null);
       setBoardState({ guesses: [], solutionIndex });
+      setIsSecretReady(false);
     }
 
     setIsStartingGame(true);
@@ -521,16 +849,13 @@ function App() {
       const provider = await universalConnector.connect();
       const ethersProvider = new BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
-
       const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
       const sessionHash = ethers.keccak256(
         ethers.toUtf8Bytes(`${session.address}-${Date.now()}-${Math.random()}`)
       );
 
-      // Сохраняем sessionHash для возможности восстановления игры
       setCurrentSessionHash(sessionHash);
-
       showAlert('Starting game...', 'info');
 
       const tx = await contract.startGame(sessionHash);
@@ -541,6 +866,32 @@ function App() {
       if (receipt.status === 1) {
         setIsGameStarted(true);
         showAlert('Game started successfully!', 'success');
+
+        // ✅ АВТОМАТИЧЕСКАЯ УСТАНОВКА СЕКРЕТА:
+        try {
+          // Получаем индекс слова из события
+          const filter = contract.filters.WordIndexChosen(session.address);
+          const from = receipt.blockNumber;
+          const to = from + 5;
+          const events = await contract.queryFilter(filter, from, to);
+
+          let wordIndex;
+          if (events.length > 0) {
+            wordIndex = Number(events[events.length - 1].args.index);
+          }
+
+          if (Number.isInteger(wordIndex)) {
+            showAlert('Auto-setting secret word...', 'info');
+
+            // ✅ АВТОМАТИЧЕСКИ УСТАНАВЛИВАЕМ СЕКРЕТ:
+            await setSecretOnchainForSelf(wordIndex);
+          } else {
+            showAlert('Failed to get word index', 'error');
+          }
+        } catch (e) {
+          console.error('Auto set secret error:', e);
+          showAlert('Failed to auto-set secret', 'error');
+        }
       } else {
         throw new Error('Transaction failed');
       }
@@ -620,6 +971,28 @@ function App() {
       // Начинаем проверку
       checkForResults();
     });
+  };
+  // Добавьте эту функцию в компонент:
+  const handleForfeitGame = async () => {
+    try {
+      const provider = await universalConnector.connect();
+      const ethersProvider = new BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+      const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+      const tx = await contract.forfeitGame();
+      showAlert('Forfeiting game...', 'info');
+      await tx.wait();
+      showAlert('Game forfeited!', 'info');
+
+      // Сбросить состояние игры
+      setIsGameStarted(false);
+      setGuesses([]);
+      setCurrentGuess('');
+      setIsSecretReady(false);
+    } catch (e) {
+      showAlert('Failed to forfeit game: ' + e.message, 'error');
+    }
   };
 
   const submitWordToContract = async word => {
@@ -748,6 +1121,10 @@ function App() {
   const handleEnter = async () => {
     if (isGameWon || isGameLost || isSubmittingWord || waitingForDecryption)
       return;
+    if (!isSecretReady) {
+      showAlert('Secret not set yet', 'warning');
+      return;
+    }
 
     if (currentGuess.length < MAX_WORD_LENGTH) {
       setIsJiggling(true);
@@ -807,22 +1184,173 @@ function App() {
       {isTutorialMode ? (
         <TutorialMode />
       ) : !isGameStarted ? (
-        <StartGameButton
-          onStartGame={() => handleStartGame(true)}
-          onContinueGame={handleContinueGame}
-          isLoading={isStartingGame || isCheckingForSavedGame}
-          hasSavedGame={savedGameInfo?.exists && savedGameInfo?.canRecover}
-          savedGuesses={savedGameInfo?.currentAttempt || 0}
-          gameAge={savedGameInfo?.gameAge || ''}
-        />
+        <>
+          <StartGameButton
+            onStartGame={() => handleStartGame(true)}
+            onContinueGame={handleContinueGame}
+            isLoading={isStartingGame || isCheckingForSavedGame}
+            hasSavedGame={savedGameInfo?.exists && savedGameInfo?.canRecover}
+            savedGuesses={savedGameInfo?.currentAttempt || 0}
+            gameAge={savedGameInfo?.gameAge || ''}
+          />
+        </>
       ) : (
         <>
+          {/* ✅ БЛОК УПРАВЛЕНИЯ ИГРОЙ */}
+          <div
+            style={{
+              margin: '12px 0',
+              textAlign: 'center',
+              padding: '8px',
+              backgroundColor: isDarkMode ? '#262626' : '#f8f9fa',
+              borderRadius: '8px',
+              border: `1px solid ${isDarkMode ? '#3a3a3c' : '#d3d6da'}`,
+            }}
+          >
+            {/* ✅ СТАТУС СЕКРЕТА - ПОКАЗЫВАЕТ ПРОГРЕСС */}
+            {isSecretReady ? (
+              <div
+                style={{
+                  color: '#6aaa64',
+                  fontSize: '14px',
+                  margin: '4px 0',
+                }}
+              >
+                ✅ Secret word is ready! Start guessing!
+              </div>
+            ) : isSettingSecret ? (
+              <div
+                style={{
+                  color: '#f59e0b',
+                  fontSize: '14px',
+                  margin: '4px 0',
+                }}
+              >
+                🎲 Auto-setting your secret word...
+              </div>
+            ) : (
+              <div
+                style={{
+                  color: '#787c7e',
+                  fontSize: '14px',
+                  margin: '4px 0',
+                }}
+              >
+                🔄 Preparing game...
+              </div>
+            )}
+
+            {/* Кнопки управления паузой */}
+            <div style={{ margin: '8px 0' }}>
+              <button
+                onClick={async () => {
+                  try {
+                    const provider = await universalConnector.connect();
+                    const ethersProvider = new BrowserProvider(provider);
+                    const signer = await ethersProvider.getSigner();
+                    const contract = new Contract(
+                      CONTRACT_ADDRESS,
+                      CONTRACT_ABI,
+                      signer
+                    );
+
+                    const isPaused = await contract.isPlayerPaused(
+                      session.address
+                    );
+
+                    if (isPaused) {
+                      const tx = await contract.unpauseMyGame();
+                      showAlert('Unpausing game...', 'info');
+                      await tx.wait();
+                      showAlert('Game unpaused!', 'success');
+                      setIsPlayerPaused(false);
+                    } else {
+                      const tx = await contract.pauseMyGame();
+                      showAlert('Pausing game...', 'info');
+                      await tx.wait();
+                      showAlert('Game paused!', 'info');
+                      setIsPlayerPaused(true);
+                    }
+                  } catch (e) {
+                    showAlert('Failed to toggle pause: ' + e.message, 'error');
+                  }
+                }}
+                disabled={!isSecretReady}
+                style={{
+                  padding: '8px 16px',
+                  margin: '0 4px',
+                  backgroundColor: !isSecretReady
+                    ? '#787c7e'
+                    : isPlayerPaused
+                    ? '#f59e0b'
+                    : '#6aaa64',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: !isSecretReady ? 'not-allowed' : 'pointer',
+                  opacity: !isSecretReady ? 0.6 : 1,
+                }}
+              >
+                {isPlayerPaused ? '▶️ Unpause Game' : '⏸️ Pause Game'}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      'Are you sure you want to forfeit this game?'
+                    )
+                  ) {
+                    handleForfeitGame();
+                  }
+                }}
+                style={{
+                  padding: '8px 16px',
+                  margin: '0 4px',
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                🏳️ Forfeit Game
+              </button>
+            </div>
+
+            {/* ✅ РАСШИРЕННЫЙ ИНДИКАТОР СОСТОЯНИЯ ИГРЫ */}
+            <div
+              style={{
+                fontSize: '12px',
+                color: isDarkMode ? '#d7dadc' : '#6e6e73',
+                margin: '4px 0',
+              }}
+            >
+              {isSettingSecret && '🎲 Setting up secret word...'}
+              {!isSecretReady && !isSettingSecret && '⏳ Game preparing...'}
+              {isPlayerPaused && '⏸️ Game is paused'}
+              {waitingForDecryption && '🔄 Waiting for decryption...'}
+              {isSubmittingWord && '📤 Submitting word...'}
+              {isSecretReady &&
+                !isPlayerPaused &&
+                !waitingForDecryption &&
+                !isSubmittingWord &&
+                '🎮 Ready to play!'}
+            </div>
+          </div>
+
+          {/* Основной игровой интерфейс */}
           <Grid
             currentGuess={currentGuess}
             guesses={guesses}
             isJiggling={isJiggling}
             setIsJiggling={setIsJiggling}
-            isSubmittingWord={isSubmittingWord || waitingForDecryption}
+            isSubmittingWord={
+              isSubmittingWord ||
+              waitingForDecryption ||
+              isPlayerPaused ||
+              !isSecretReady
+            }
             contractResults={contractResults}
           />
           <Keyboard
@@ -830,11 +1358,17 @@ function App() {
             onDelete={handleDelete}
             onKeyDown={handleKeyDown}
             guesses={guesses}
-            isSubmittingWord={isSubmittingWord || waitingForDecryption}
+            isSubmittingWord={
+              isSubmittingWord ||
+              waitingForDecryption ||
+              isPlayerPaused ||
+              !isSecretReady
+            }
             contractResults={contractResults}
           />
         </>
       )}
+
       <InfoModal
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}

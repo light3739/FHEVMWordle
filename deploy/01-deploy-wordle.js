@@ -1,48 +1,43 @@
 // deploy/01-deploy-wordle.js
-const { ethers } = require('hardhat');
+// Usage:
+//   npx hardhat run deploy/01-deploy-wordle.js --network sepolia
+
+const hre = require('hardhat');
+const { ethers } = hre;
+const { readFileSync } = require('fs');
 
 async function main() {
   const net = await ethers.provider.getNetwork();
   console.log('🌐 Active network:', net.name, Number(net.chainId));
-  if (Number(net.chainId) !== 11155111) {
-    throw new Error('Not on Sepolia (chainId must be 11155111)');
-  }
 
-  console.log('🔒 Deploying FIXED FHEVMWordleFHE on Sepolia!');
+  // 1) читаем Merkle-артефакты
+  const root = readFileSync('dist/merkle-root.txt', 'utf8').trim();
+  const { leaves } = JSON.parse(readFileSync('dist/words.json', 'utf8'));
+  console.log('🌳 merkleRoot:', root);
+  console.log('🍃 leaves:', leaves);
+
+  // 2) деплой контракта c конструктором (root, leaves)
   const [deployer] = await ethers.getSigners();
-  console.log('💪 Deploying with account:', deployer.address);
-  const balance = await ethers.provider.getBalance(deployer.address);
-  console.log('💰 Account balance:', ethers.formatEther(balance), 'ETH');
-
-  const FHEVMWordleFHE = await ethers.getContractFactory(
-    'FHEVMWordleFHE_Fixed'
+  console.log('💪 Deployer:', deployer.address);
+  console.log(
+    '💰 Balance:',
+    ethers.formatEther(await ethers.provider.getBalance(deployer.address)),
+    'ETH'
   );
-  console.log('🚀 Deploying FIXED contract...');
-  const contract = await FHEVMWordleFHE.deploy();
-  await contract.waitForDeployment();
-  const contractAddress = await contract.getAddress();
-  console.log('✅ FIXED FHEVMWordleFHE deployed to:', contractAddress);
 
-  // Включаем «прод» FHE-режим
-  const testMode = await contract.testMode();
-  console.log('🧪 Test mode (before):', testMode);
-  if (testMode) {
-    console.log('🔄 Switching to PRODUCTION mode...');
-    const tx = await contract.setTestMode(false);
-    await tx.wait();
-  }
-  console.log('🧪 Test mode (after):', await contract.testMode());
-  console.log('🔒 Now using REAL FHE operations!');
+  console.log('🚀 Deploying FHEVMWordleMerkle...');
+  const F = await ethers.getContractFactory('FHEVMWordleMerkle');
+  const c = await F.deploy(root, leaves);
+  await c.waitForDeployment();
+  const addr = await c.getAddress();
+  console.log('✅ Deployed at:', addr);
 
-  console.log('\n🎉 FIXED FHE DEPLOYMENT COMPLETE!');
-  console.log('📍 Contract Address:', contractAddress);
+  console.log('\n🎉 Deployment complete');
+  console.log('📍 Contract Address:', addr);
   console.log('🌐 Network:', net.name, Number(net.chainId));
-  return contractAddress;
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch(e => {
-    console.error(e);
-    process.exit(1);
-  });
+main().catch(e => {
+  console.error(e);
+  process.exit(1);
+});
