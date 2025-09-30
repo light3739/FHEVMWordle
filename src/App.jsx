@@ -867,30 +867,29 @@ function App() {
         setIsGameStarted(true);
         showAlert('Game started successfully!', 'success');
 
-        // ✅ АВТОМАТИЧЕСКАЯ УСТАНОВКА СЕКРЕТА:
+        // ✅ ИСПРАВЛЕНИЕ: Получаем wordIndex из gameState
         try {
-          // Получаем индекс слова из события
-          const filter = contract.filters.WordIndexChosen(session.address);
-          const from = receipt.blockNumber;
-          const to = from + 5;
-          const events = await contract.queryFilter(filter, from, to);
+          showAlert('Getting word index...', 'info');
 
-          let wordIndex;
-          if (events.length > 0) {
-            wordIndex = Number(events[events.length - 1].args.index);
-          }
+          // Получаем обновленное состояние игры
+          const gameState = await contract.games(session.address);
+          const wordIndex = Number(gameState.wordIndex);
 
-          if (Number.isInteger(wordIndex)) {
+          console.log('Game state:', gameState);
+          console.log('Word index from gameState:', wordIndex);
+
+          if (Number.isInteger(wordIndex) && wordIndex >= 0) {
             showAlert('Auto-setting secret word...', 'info');
 
             // ✅ АВТОМАТИЧЕСКИ УСТАНАВЛИВАЕМ СЕКРЕТ:
             await setSecretOnchainForSelf(wordIndex);
           } else {
-            showAlert('Failed to get word index', 'error');
+            showAlert('Failed to get word index from game state', 'error');
+            console.error('Invalid wordIndex:', wordIndex, typeof wordIndex);
           }
         } catch (e) {
           console.error('Auto set secret error:', e);
-          showAlert('Failed to auto-set secret', 'error');
+          showAlert('Failed to auto-set secret: ' + e.message, 'error');
         }
       } else {
         throw new Error('Transaction failed');
