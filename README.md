@@ -119,10 +119,10 @@ npm start
 
 ```bash
 # Compile contracts
-npx hardhat compile
+npx hardhat compile --network sepolia
 
 # Deploy to Sepolia testnet
-npx hardhat run deploy/01-deploy-wordle.js --network sepolia
+npx hardhat run scripts/deploy.js --network sepolia
 
 # Update REACT_APP_CONTRACT_ADDRESS in .env with deployed address
 ```
