@@ -386,12 +386,12 @@ contract.on('GuessEvaluated', (player, attemptNumber, results) => {
           {
             title: 'Compile Contracts',
             description: 'Build the smart contracts',
-            command: 'npx hardhat compile'
+            command: 'npx hardhat compile --network sepolia'
           },
           {
             title: 'Deploy to Sepolia',
             description: 'Deploy contract to Sepolia testnet',
-            command: 'npx hardhat run deploy/01-deploy-wordle.js --network sepolia'
+            command: 'npx hardhat run scripts/deploy.js --network sepolia'
           },
           {
             title: 'Update Environment',
@@ -421,7 +421,7 @@ contract.on('GuessEvaluated', (player, attemptNumber, results) => {
         '🎨 Interpret Results (🟩🟨⬛ colors)',
         '🏆 Win or Learn (6 attempts maximum)'
       ],
-      codeExample: `// deploy/01-deploy-wordle.js
+      codeExample: `// scripts/deploy.js
 const { ethers } = require("hardhat");
 
 async function main() {
@@ -554,7 +554,7 @@ main().catch((error) => {
           <div className={styles.progressSection}>
             <div className={styles.progressInfo}>
               <span className={styles.progressText}>
-                Progress: {completedCards.size}/{tutorialCards.length} cards completed
+                Tutorial Progress: {completedCards.size}/{tutorialCards.length} sections completed
               </span>
               <span className={styles.progressPercentage}>
                 {Math.round(progressPercentage)}%
@@ -566,6 +566,11 @@ main().catch((error) => {
                 style={{ width: `${progressPercentage}%` }}
               ></div>
             </div>
+            {progressPercentage === 100 && (
+              <div className={styles.completionMessage}>
+                🎉 Congratulations! You've completed the FHEVM Wordle tutorial!
+              </div>
+            )}
           </div>
         </div>
         

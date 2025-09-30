@@ -256,6 +256,32 @@
   }
 }
 
+.completionMessage {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(var(--color-correct), 0.1), rgba(var(--color-present), 0.1));
+  border: 2px solid var(--color-correct);
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  animation: celebration 0.6s ease-in-out;
+}
+
+@keyframes celebration {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 // Enhanced search input with focus effects
 .searchInput {
   width: 100%;
