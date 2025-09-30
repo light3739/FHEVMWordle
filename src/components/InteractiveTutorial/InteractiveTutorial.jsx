@@ -377,7 +377,7 @@ main().catch((error) => {
         {/* Header with progress and controls */}
         <div className={styles.header}>
           <div className={styles.headerTop}>
-            <h1 className={styles.title}>🔐 FHEVM Wordle - Interactive Developer Tutorial</h1>
+            <h1 className={styles.title}>FHEVM Wordle - Interactive Developer Tutorial</h1>
           </div>
           
         <p className={styles.subtitle}>

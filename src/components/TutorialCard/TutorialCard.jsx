@@ -426,9 +426,9 @@ const TutorialCard = ({
                 <div className={styles.faqList}>
                   <h4>Frequently Asked Questions:</h4>
                   {faq.map((item, index) => (
-                    <div key={index} className={styles.faqItem}>
-                      <h5>{item.question}</h5>
-                      <p>{item.answer}</p>
+                    <div key={index}>
+                      <h5 className={styles.faqQuestion}>{item.question}</h5>
+                      <p className={styles.faqAnswer}>{item.answer}</p>
                     </div>
                   ))}
                 </div>
