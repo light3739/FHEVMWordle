@@ -46,7 +46,7 @@ const CONTRACT_ABI = [
   'event GuessEvaluated(address indexed player, uint8 attemptNumber, uint8[5] results)',
   'event WordIndexChosen(address indexed player, uint32 index)',
   'function setEncryptedSecretWord(address player, uint32 index, bytes[] encryptedLetters, bytes inputProof, bytes32[] merkleProof, bytes32 leaf)',
-  'function games(address) view returns (uint256 gameId,address player,uint8 status,uint8 currentAttempt,uint256 startTime,uint256 GAME_TIMEOUT,bytes32 sessionHash,uint256 wordIndex,bool canRecover,uint256 pendingRequestId,bool secretSet)',
+  'function games(address) view returns (uint256 gameId,address player,uint8 currentAttempt,uint8 status,uint256 startTime,uint256 endTime,bytes32 sessionHash,uint256 wordIndex,bool canRecover,uint256 pendingRequestId,bool secretSet)',
   'function owner() view returns (address)',
   'function merkleRoot() view returns (bytes32)',
   'function merkleLeaves() view returns (uint32)',
