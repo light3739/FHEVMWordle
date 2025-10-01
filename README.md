@@ -362,7 +362,7 @@ But... it's the ONLY way to have true on-chain privacy! 🔐
 
 ```bash
 # Compile contracts
-npx hardhat compile
+npx hardhat compile --network sepolia
 
 # Run test suite
 npx hardhat test
