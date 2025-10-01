@@ -13,7 +13,8 @@ const VictoryModal = ({
   };
 
   const handleSendFeedback = () => {
-    // Простая декоративная кнопка без функционала
+    // Перекидываем на Twitter/X профиль для отзывов
+    window.open('https://x.com/X15609', '_blank');
     onClose();
   };
 
