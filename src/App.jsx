@@ -74,10 +74,6 @@ const CONTRACT_ABI = [
 
 
 const RPC_SEPOLIA = process.env.REACT_APP_RPC_SEPOLIA;
-const FHE_KMS = process.env.REACT_APP_FHEVM_KMS;
-const FHE_ACL = process.env.REACT_APP_FHEVM_ACL;
-const FHE_RELAYER = process.env.REACT_APP_FHEVM_RELAYER;
-const OWNER_ADDRESS = (process.env.REACT_APP_OWNER_ADDRESS || '').toLowerCase();
 
 function App() {
   const [isSettingSecret, setIsSettingSecret] = useState(false);
