@@ -32,6 +32,35 @@ button {
   border: none;
 }
 
+.tutorial-button {
+  margin: 0.5rem;
+  padding: 0.5rem;
+  background: #2563eb;
+  color: white;
+  border: 2px solid #1d4ed8;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 48px;
+  
+  &:hover {
+    background: #1d4ed8;
+    border-color: #1e40af;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.4);
+  }
+  
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+}
+
 @media screen and (max-width: 480px) {
   h1 {
     font-size: 2rem;
@@ -39,5 +68,12 @@ button {
   
   .title-container {
     gap: 6px;
+  }
+  
+  .tutorial-button {
+    padding: 0.4rem;
+    margin: 0.2rem;
+    min-width: 44px;
+    height: 44px;
   }
 }

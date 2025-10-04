@@ -4,6 +4,7 @@ import {
   BsInfoCircle,
   BsWallet,
   BsWalletFill,
+  BsBook,
 } from 'react-icons/bs';
 import './Header.module.scss';
 
@@ -31,6 +32,13 @@ const Header = ({
         <h1>WORDLE/ZAMA</h1>
       </div>
       <div>
+        <button 
+          className="tutorial-button"
+          onClick={() => window.open('https://gist.github.com/light3739/1798e7f82f5fa95b2817c412e9687a32', '_blank')}
+          title="View Tutorial"
+        >
+          <BsBook size="1.6rem" color="white" />
+        </button>
         <button onClick={() => setIsStatsModalOpen(true)}>
           <BsBarChart size="1.6rem" color="var(--color-icon)" />
         </button>
