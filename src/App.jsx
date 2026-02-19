@@ -104,7 +104,11 @@ function App() {
           await initSDK();
 
           // Create FHE instance with SepoliaConfig (relayer.testnet.zama.org)
-          const config = { ...SepoliaConfig, network: window.ethereum };
+          // Use dedicated Sepolia RPC (not window.ethereum which may be on wrong network)
+          const config = {
+            ...SepoliaConfig,
+            network: RPC_SEPOLIA || 'https://sepolia.infura.io/v3/17d9c7c455364415a1d9186f7774517e',
+          };
           const instance = await createInstance(config);
 
           setFheInstance(instance);
