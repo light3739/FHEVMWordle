@@ -119,6 +119,7 @@ function App() {
 
     init();
   }, [session, fheInstance, showAlert]);
+  // eslint-disable-next-line no-unused-vars
   async function testMerkleOnly() {
     try {
       const provider = await universalConnector.connect();
@@ -408,7 +409,7 @@ function App() {
     'contractResults',
     {}
   );
-  const [currentSessionHash, setCurrentSessionHash] = useLocalStorage(
+  const [, setCurrentSessionHash] = useLocalStorage(
     'currentSessionHash',
     null
   );
@@ -482,6 +483,7 @@ function App() {
     if (session && universalConnector && !isGameStarted) {
       checkForSavedGame();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, universalConnector, isGameStarted]);
 
   // Initialize Universal Connector

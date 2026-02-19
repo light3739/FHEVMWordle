@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import TutorialCard from '../TutorialCard';
 import styles from './InteractiveTutorial.module.scss';
 
@@ -17,7 +17,7 @@ const InteractiveTutorial = () => {
       'deployment': '🚀',
       'faq': '❓'
     };
-    
+
     // Special cases based on card ID or title
     const specialIcons = {
       'intro': '🔐', // FHEVM concept
@@ -27,7 +27,7 @@ const InteractiveTutorial = () => {
       'deployment': '🌐', // Production deployment
       'faq': '🛠️' // Troubleshooting
     };
-    
+
     const icon = specialIcons[card.id] || iconMap[card.type] || '📋';
     console.log(`Card ${card.id} (${card.type}) -> Icon: ${icon}`);
     return icon;
@@ -233,7 +233,7 @@ result = FHE.select(exact, FHE.asEuint8(3), result);`
         contractStructure: {
           constants: [
             'uint8 public constant WORD_LENGTH = 5',
-            'uint8 public constant MAX_ATTEMPTS = 6', 
+            'uint8 public constant MAX_ATTEMPTS = 6',
             'uint256 public constant GAME_TIMEOUT = 24 hours'
           ],
           encryptedStorage: [
@@ -544,11 +544,11 @@ main().catch((error) => {
           <div className={styles.headerTop}>
             <h1 className={styles.title}>FHEVM Wordle - Interactive Developer Tutorial</h1>
           </div>
-          
-        <p className={styles.subtitle}>
-          Learn how to build privacy-preserving applications with Zama AI's FHEVM technology. 
-          Click on any card below to see detailed step-by-step instructions.
-        </p>
+
+          <p className={styles.subtitle}>
+            Learn how to build privacy-preserving applications with Zama AI's FHEVM technology.
+            Click on any card below to see detailed step-by-step instructions.
+          </p>
 
           {/* Progress Bar */}
           <div className={styles.progressSection}>
@@ -561,7 +561,7 @@ main().catch((error) => {
               </span>
             </div>
             <div className={styles.progressBar}>
-              <div 
+              <div
                 className={styles.progressFill}
                 style={{ width: `${progressPercentage}%` }}
               ></div>
@@ -573,8 +573,8 @@ main().catch((error) => {
             )}
           </div>
         </div>
-        
-        
+
+
         <div className={styles.cardsGrid}>
           {tutorialCards.map((card) => (
             <TutorialCard
@@ -587,7 +587,7 @@ main().catch((error) => {
             />
           ))}
         </div>
-        
+
         <div className={styles.footer}>
           <h3>🎯 Next Steps</h3>
           <p>
