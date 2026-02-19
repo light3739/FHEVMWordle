@@ -19,7 +19,7 @@ import {
   initSDK,
   createInstance,
   SepoliaConfig,
-} from '@zama-fhe/relayer-sdk/bundle';
+} from '@zama-fhe/relayer-sdk/web';
 
 import {
   solution,
@@ -43,24 +43,24 @@ const CONTRACT_ABI = [
   'function startGame(bytes32 sessionHash)',
   'function submitGuess(uint8[5] guess)',
   'function requestDecryptResults()',
-  
+
   // === SECRET SETTING ===
   'function setEncryptedSecretWord(address player, uint32 index, bytes[] encryptedLetters, bytes inputProof, bytes32[] merkleProof, bytes32 leaf)',
-  
+
   // ✅ ИСПРАВЛЕННАЯ СТРУКТУРА games() - ТОЧНО ПО КОНТРАКТУ:
   'function games(address) view returns (uint256 gameId, address player, uint8 currentAttempt, uint8 status, uint256 startTime, uint256 endTime, bytes32 sessionHash, uint256 wordIndex, bool canRecover, uint256 pendingRequestId, bool secretSet)',
-  
+
   // === PAUSE MANAGEMENT ===
   'function pauseMyGame()',
   'function unpauseMyGame()',
   'function isPlayerPaused(address player) view returns (bool)',
   'function forfeitGame()',
-  
+
   // === VIEW FUNCTIONS ===
   'function merkleRoot() view returns (bytes32)',
   'function merkleLeaves() view returns (uint32)',
   'function owner() view returns (address)',
-  
+
   // === EVENTS ===
   'event GameStarted(address indexed player, uint256 indexed gameId, bytes32 sessionHash, uint256 timestamp, uint256 wordIndex)',
   'event GuessSubmitted(address indexed player, uint256 indexed gameId, uint8 attemptNumber, uint256 timestamp)',
@@ -100,19 +100,10 @@ function App() {
         try {
           showAlert('Initializing FHE engine...', 'info');
 
-          // Ждем загрузки CDN
-          let attempts = 0;
-          while (!window.relayerSDK && attempts < 50) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-          }
+          // Initialize WASM modules (v0.4.1)
+          await initSDK();
 
-          if (!window.relayerSDK) {
-            console.warn('CDN not loaded, trying direct import...');
-          }
-
-          // Точно по документации
-          await initSDK(); // Load needed WASM
+          // Create FHE instance with SepoliaConfig (relayer.testnet.zama.org)
           const config = { ...SepoliaConfig, network: window.ethereum };
           const instance = await createInstance(config);
 
@@ -525,7 +516,7 @@ function App() {
         setSession(newSession);
         try {
           localStorage.setItem('walletSession', JSON.stringify(newSession));
-        } catch {}
+        } catch { }
       } catch {
         setSession(undefined);
       }
@@ -645,7 +636,7 @@ function App() {
         localStorage.setItem('walletSession', JSON.stringify(newSession));
         localStorage.setItem('userAddress', address);
         localStorage.setItem('selectedNetwork', String(chainId));
-      } catch {}
+      } catch { }
 
       setIsWalletModalOpen(false);
       setBlockAutoReconnect(false);
@@ -673,13 +664,13 @@ function App() {
     // Чистим штатный ключ Web3Modal v1 (на всякий случай)
     try {
       localStorage.removeItem('WEB3_CONNECT_CACHED_PROVIDER');
-    } catch {}
+    } catch { }
 
     // Чистим вашу сессию
     setSession(undefined);
     try {
       localStorage.removeItem('walletSession');
-    } catch {}
+    } catch { }
 
     // Очистка игрового ввода/состояния
     setCurrentGuess('');
@@ -701,7 +692,7 @@ function App() {
       localStorage.removeItem('userAddress');
       localStorage.removeItem('userProfile');
       sessionStorage.clear();
-    } catch {}
+    } catch { }
     setIsWalletModalOpen(false);
     showAlert('Wallet disconnected', 'success');
   };
@@ -1294,8 +1285,8 @@ function App() {
                   backgroundColor: !isSecretReady
                     ? '#787c7e'
                     : isPlayerPaused
-                    ? '#f59e0b'
-                    : '#6aaa64',
+                      ? '#f59e0b'
+                      : '#6aaa64',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',

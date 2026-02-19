@@ -16,7 +16,7 @@ export const useFhevm = () => {
       try {
         // Динамический импорт чтобы избежать SES проблем
         const { initSDK, createInstance, SepoliaConfig } = await import(
-          '@zama-fhe/relayer-sdk/bundle'
+          '@zama-fhe/relayer-sdk/web'
         );
 
         // Инициализация SDK
