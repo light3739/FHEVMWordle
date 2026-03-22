@@ -101,7 +101,8 @@ function App() {
           showAlert('Initializing FHE engine...', 'info');
 
           // Initialize WASM modules (v0.4.1)
-          await initSDK();
+          // thread: 1 disables multi-threaded WASM pool (avoids SES lockdown + browser crashes)
+          await initSDK({ thread: 1 });
 
           // Create FHE instance with SepoliaConfig (relayer.testnet.zama.org)
           // Use dedicated Sepolia RPC (not window.ethereum which may be on wrong network)
@@ -123,97 +124,66 @@ function App() {
 
     init();
   }, [session, fheInstance, showAlert]);
-  // eslint-disable-next-line no-unused-vars
-  async function testMerkleOnly() {
-    try {
-      const provider = await universalConnector.connect();
-      const ethersProvider = new BrowserProvider(provider);
-      const signer = await ethersProvider.getSigner();
-      const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
-      const playerAddress = session.address;
-      const gameState = await contract.games(playerAddress);
-      const actualIndex = parseInt(gameState.wordIndex.toString());
-      const item = wordsMeta.items[actualIndex];
-
-      console.log('=== TESTING MERKLE VERIFICATION DIRECTLY ===');
-
-      // Проверим локально если у нас есть ethers utils
-      const merkleRoot = await contract.merkleRoot();
-      console.log('Contract root:', merkleRoot);
-      console.log('Item leaf:', item.leaf);
-      console.log('Item proof length:', item.proof.length);
-      console.log('Item proof:', item.proof);
-
-      // Попробуем статический вызов с минимальными данными
-      const testCalldata = contract.interface.encodeFunctionData(
-        'setEncryptedSecretWord',
-        [
-          playerAddress,
-          actualIndex,
-          '0x' + '00'.repeat(32), // l0
-          '0x' + '00'.repeat(32), // l1
-          '0x' + '00'.repeat(32), // l2
-          '0x' + '00'.repeat(32), // l3
-          '0x' + '00'.repeat(32), // l4
-          '0x00', // минимальный inputProof
-          item.proof,
-          item.leaf,
-        ]
-      );
-
-      console.log('Generated calldata length:', testCalldata.length);
-      console.log('Generated calldata:', testCalldata);
-
-      // Попробуем через низкоуровневый call
-      try {
-        await ethersProvider.call({
-          to: CONTRACT_ADDRESS,
-          data: testCalldata,
-          from: playerAddress,
-        });
-        console.log('✅ LOW LEVEL CALL PASSED');
-      } catch (lowLevelError) {
-        console.error('❌ Low level call failed:', lowLevelError);
-
-        // Попробуем с другим листом (индекс 0)
-        const item0 = wordsMeta.items[0];
-        const testCalldata0 = contract.interface.encodeFunctionData(
-          'setEncryptedSecretWord',
-          [
-            playerAddress,
-            0, // ИНДЕКС 0
-            '0x' + '00'.repeat(32),
-            '0x' + '00'.repeat(32),
-            '0x' + '00'.repeat(32),
-            '0x' + '00'.repeat(32),
-            '0x' + '00'.repeat(32),
-            '0x00',
-            item0.proof,
-            item0.leaf,
-          ]
-        );
-
+  useEffect(() => {
+    if (session && universalConnector && wordsMeta) {
+      window.testMerkle = async () => {
         try {
-          await ethersProvider.call({
-            to: CONTRACT_ADDRESS,
-            data: testCalldata0,
-            from: playerAddress,
-          });
-          console.log('✅ INDEX 0 LOW LEVEL CALL PASSED');
-          showAlert(
-            'Index 0 works, current index has wrong merkle data!',
-            'warning'
-          );
-        } catch (index0Error) {
-          console.error('❌ Even index 0 low level call failed:', index0Error);
-          showAlert('Complete merkle verification failure', 'error');
+          const provider = await universalConnector.connect();
+          const ethersProvider = new BrowserProvider(provider);
+          const signer = await ethersProvider.getSigner();
+          const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+          const playerAddress = session.address;
+          const gameState = await contract.games(playerAddress);
+          const actualIndex = Number(gameState.wordIndex);
+          const item = wordsMeta.items[actualIndex];
+
+          console.log('=== DIAGNOSTIC: TESTING MERKLE VERIFICATION ===');
+          console.log('Contract Address:', CONTRACT_ADDRESS);
+          console.log('Player Address:', playerAddress);
+          console.log('Actual Word Index (from contract):', actualIndex);
+
+          if (!item) {
+            console.error('❌ Word index', actualIndex, 'not found in wordsMeta.items');
+            return;
+          }
+
+          console.log('Item Word:', item.word);
+          console.log('Item Leaf:', item.leaf);
+          console.log('Item Proof:', item.proof);
+
+          const contractRoot = await contract.merkleRoot();
+          console.log('Contract Root:', contractRoot);
+          console.log('WordsMeta Root:', wordsMeta.root);
+
+          // We try a static call to see if it reverts
+          try {
+            console.log('Executing staticCall for setEncryptedSecretWord...');
+            // Using dummy handles for Merkle check (handles are not checked against leaf content in this contract)
+            const dummyHandles = Array(5).fill(ethers.AbiCoder.defaultAbiCoder().encode(['(bytes32)'], [[ethers.ZeroHash]]));
+            const dummyProof = '0x';
+
+            await contract.setEncryptedSecretWord.staticCall(
+              playerAddress,
+              actualIndex,
+              dummyHandles,
+              dummyProof,
+              item.proof,
+              item.leaf
+            );
+            console.log('✅ STATIC CALL PASSED (Merkle proof is valid!)');
+            alert('✅ Merkle proof is valid!');
+          } catch (error) {
+            console.error('❌ STATIC CALL FAILED:', error);
+            if (error.data) console.error('Error data:', error.data);
+            alert('❌ Merkle verification failed: ' + (error.reason || error.message));
+          }
+        } catch (e) {
+          console.error('Diagnostic error:', e);
         }
-      }
-    } catch (e) {
-      console.error('testMerkleOnly error:', e);
+      };
     }
-  }
+  }, [session, universalConnector, wordsMeta]);
 
   async function setSecretOnchainForSelf(index) {
     console.log('=== MERKLE COMPATIBILITY CHECK ===');
@@ -318,14 +288,14 @@ function App() {
       console.log('Handles count:', handles.length);
       console.log('Encoded handles count:', encodedHandles.length);
 
-      // ПРЯМОЙ вызов с реальными данными
-      console.log('=== EXECUTING WITH REAL FHE DATA ===');
-
       try {
+        console.log('DEBUG: Input proof length:', inputProof.length);
+        console.log('DEBUG: First 10 encoded handles:', encodedHandles.slice(0, 2));
+
         await contract.setEncryptedSecretWord.staticCall(
           playerAddress,
           actualIndex,
-          encodedHandles, // ✅ ИСПОЛЬЗУЕМ encodedHandles
+          encodedHandles,
           inputProof,
           item.proof,
           item.leaf,
@@ -335,11 +305,10 @@ function App() {
         console.log('✅ StaticCall validation PASSED!');
         showAlert('Validation passed, sending transaction...', 'info');
 
-        // ✅ ИСПОЛЬЗУЕМ encodedHandles В РЕАЛЬНОЙ ТРАНЗАКЦИИ:
         const tx = await contract.setEncryptedSecretWord(
           playerAddress,
           actualIndex,
-          encodedHandles, // ✅ ИСПОЛЬЗУЕМ encodedHandles
+          encodedHandles,
           inputProof,
           item.proof,
           item.leaf,
@@ -351,15 +320,20 @@ function App() {
         const receipt = await tx.wait();
         console.log('Transaction status:', receipt.status);
 
-        if (receipt.status === 1) {
+        if (receipt.status !== 0) {
           showAlert('✅ Secret set successfully!', 'success');
           setIsSecretReady(true);
         } else {
-          throw new Error('Transaction failed');
+          throw new Error('Transaction execution reverted');
         }
       } catch (fheError) {
-        console.error('❌ FHE transaction failed:', fheError);
-        showAlert('Transaction failed: ' + fheError.message, 'error');
+        console.error('❌ Secret Setting Failed:', fheError);
+        let msg = fheError.message;
+        if (fheError.data) {
+          console.error('Error data:', fheError.data);
+          msg += ' (Data: ' + fheError.data.slice(0, 10) + '...)';
+        }
+        showAlert('Failed: ' + msg, 'error');
       }
     } catch (e) {
       console.error('setSecretOnchainForSelf error:', e);
@@ -422,7 +396,8 @@ function App() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/dist/words.json');
+        const WORDS_URL = 'https://fhevm-wordle.vercel.app/dist/words.json';
+        const res = await fetch(WORDS_URL);
         const meta = await res.json();
         setWordsMeta(meta);
       } catch (e) {
