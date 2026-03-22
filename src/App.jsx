@@ -97,7 +97,7 @@ function App() {
   useEffect(() => {
     const init = async () => {
       if (!session || fheInstance || fheInitStarted.current) return;
-      
+
       fheInitStarted.current = true;
       console.log('Initializing FHE engine...');
 
@@ -331,7 +331,7 @@ function App() {
 
   async function debugOneInputTest() {
     console.log('🧪 DEBUG: debugOneInputTest called');
-    
+
     if (!fheInstance || !session || !universalConnector) {
       const msg = `Dependencies missing: FHE=${!!fheInstance}, Session=${!!session}, UC=${!!universalConnector}`;
       console.warn('🧪 DEBUG:', msg);
@@ -345,7 +345,7 @@ function App() {
     try {
       const provider = await universalConnector.connect();
       console.log('🧪 DEBUG: Provider connected. Getting signer...');
-      
+
       const ethersProvider = new BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
       const signerAddress = await signer.getAddress();
@@ -374,10 +374,10 @@ function App() {
         gasLimit: 1500000,
       });
       console.log('🧪 DEBUG: Transaction hash:', tx.hash);
-      
+
       showAlert('⏳ Waiting for confirmation...', 'info');
       await tx.wait();
-      
+
       console.log('🧪 DEBUG: Transaction confirmed!');
       showAlert('✅ Isolated input test passed!', 'success');
     } catch (e) {
@@ -556,28 +556,7 @@ function App() {
     };
   }, [isTutorialMode]);
 
-  // Check game winning or losing
-  useEffect(() => {
-    if (guesses.includes(solution.toUpperCase())) {
-      setIsGameWon(true);
-      setTimeout(() => showAlert('Well done', 'success'), ALERT_DELAY);
-      setTimeout(() => setIsVictoryModalOpen(true), ALERT_DELAY + 1000);
-      // Очищаем sessionHash после победы
-      setCurrentSessionHash(null);
-      setSavedGameInfo(null);
-    } else if (guesses.length === MAX_CHALLENGES) {
-      setIsGameLost(true);
-      setTimeout(
-        () => showAlert(`The word was ${solution}`, 'error', true),
-        ALERT_DELAY
-      );
-      setTimeout(() => setIsStatsModalOpen(true), ALERT_DELAY + 1000);
-      // Очищаем sessionHash после поражения
-      setCurrentSessionHash(null);
-      setSavedGameInfo(null);
-    }
-    // eslint-disable-next-line
-  }, [guesses]);
+  // Check game winning or losing is now handled inside processGuessResults
 
   // Handle wallet connection
   useEffect(() => {
@@ -963,14 +942,15 @@ function App() {
 
       const currentGame = await contract.games(session.address);
       const attemptIndex = Number(currentGame.currentAttempt) - 1;
+      const currentWordIndex = Number(currentGame.wordIndex);
 
       showAlert('🔓 Decrypting results...', 'info');
       const results = await decryptResults(contract, session.address, attemptIndex);
 
       if (results) {
-        await processGuessResults(word, results);
-        showAlert('Guess evaluated!', 'success');
+        return await processGuessResults(word, results, currentWordIndex);
       }
+      return false;
     } catch (error) {
       console.error('Contract interaction failed:', error);
       throw error;
@@ -1012,11 +992,11 @@ function App() {
       const signer = await ethersProvider.getSigner();
 
       showAlert('🔐 Please sign the decryption request in your wallet...', 'info');
-      
+
       // ethers v6 signTypedData(domain, types, value)
       // Note: types should NOT include EIP712Domain
       const { EIP712Domain, ...signingTypes } = eip712.types;
-      
+
       const signature = await signer.signTypedData(
         eip712.domain,
         signingTypes,
@@ -1028,7 +1008,8 @@ function App() {
       // 5. Call userDecrypt
       const handleContractPairs = handles.map(h => ({
         handle: h,
-        contractAddress: CONTRACT_ADDRESS
+        contractAddress: CONTRACT_ADDRESS,
+        type: 2 // euint8
       }));
 
       const resultsRecord = await fheInstance.userDecrypt(
@@ -1042,8 +1023,12 @@ function App() {
         duration
       );
 
-      // 6. Map results back to array order
-      const results = handles.map(h => Number(resultsRecord[h]));
+      // 6. Map results back to array order with case-insensitive lookup
+      console.log('🧪 DEBUG: resultsRecord keys:', Object.keys(resultsRecord));
+      const results = handles.map(h => {
+        const val = resultsRecord[h.toLowerCase()] ?? resultsRecord[h.toUpperCase()] ?? resultsRecord[h];
+        return val !== undefined ? Number(val) : 1; // Default to 1 (Absent) if missing
+      });
 
       console.log('🧪 DEBUG: Decrypted results:', results);
       return results;
@@ -1054,7 +1039,7 @@ function App() {
     }
   };
 
-  const processGuessResults = async (word, results) => {
+  const processGuessResults = async (word, results, currentWordIndex) => {
     console.log(`=== PROCESSING GUESS RESULTS ===`);
     console.log(`Word: ${word}`);
     console.log(`Raw results from contract:`, results);
@@ -1093,20 +1078,20 @@ function App() {
       showAlert('Congratulations! You won!', 'success');
       setTimeout(() => setIsVictoryModalOpen(true), 1000);
       setStats(addStatsForCompletedGame(stats, guesses.length + 1));
-      // Очищаем sessionHash после победы
       setCurrentSessionHash(null);
       setSavedGameInfo(null);
-      return;
+      return true;
     }
 
     if (guesses.length + 1 >= MAX_CHALLENGES) {
       setIsGameLost(true);
-      showAlert(`Game over! The word was: ${solution}`, 'error');
+      const actualWord = wordsMeta?.items[currentWordIndex]?.word || solution;
+      showAlert(`Game over! The word was: ${actualWord}`, 'error');
       setStats(addStatsForCompletedGame(stats, guesses.length + 1));
-      // Очищаем sessionHash после поражения
       setCurrentSessionHash(null);
       setSavedGameInfo(null);
     }
+    return false;
   };
 
   const handleKeyDown = letter =>
@@ -1150,15 +1135,15 @@ function App() {
     setIsSubmittingWord(true);
 
     try {
-      await submitWordToContract(currentGuess);
+      const isWin = await submitWordToContract(currentGuess);
 
       setGuesses([...guesses, currentGuess]);
       setCurrentGuess('');
 
-      if (currentGuess === solution.toUpperCase()) {
-        setStats(addStatsForCompletedGame(stats, guesses.length + 1));
+      if (isWin) {
+        // Stats already updated inside processGuessResults
       } else if (guesses.length + 1 === MAX_CHALLENGES) {
-        setStats(addStatsForCompletedGame(stats, guesses.length + 1));
+        // Stats already updated inside processGuessResults
       }
     } catch (error) {
       console.error('Failed to submit word:', error);

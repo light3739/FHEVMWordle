@@ -54,8 +54,8 @@ const CurrentRow = ({ guess, isJiggling, isSubmittingWord }) => {
 
 const CompletedRow = ({ guess, contractResults }) => {
   const cells = guess.split('');
-  // Используем результаты от контракта если они есть, иначе локальную логику
-  const statuses = contractResults || getGuessStatuses(guess);
+  // Используем результаты от контракта если они есть, иначе пустой массив
+  const statuses = contractResults || Array(MAX_WORD_LENGTH).fill('');
 
   return (
     <div className={styles.row}>

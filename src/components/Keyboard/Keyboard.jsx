@@ -21,9 +21,6 @@ const getStatusesFromContract = (guesses, contractResults) => {
           charObj[letter.toUpperCase()] = newStatus;
         }
       });
-    } else {
-      // Fallback к локальной логике если результатов от контракта нет
-      return getStatuses(guesses);
     }
   });
   
