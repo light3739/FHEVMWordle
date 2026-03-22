@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from 'components/Header';
 import Grid from 'components/Grid';
 import Keyboard from 'components/Keyboard';
@@ -94,31 +94,31 @@ function App() {
   const [isCheckingForSavedGame, setIsCheckingForSavedGame] = useState(false);
   const { showAlert } = useAlert();
 
+  const fheInitStarted = useRef(false);
+
   useEffect(() => {
     const init = async () => {
-      if (session && !fheInstance) {
-        try {
-          showAlert('Initializing FHE engine...', 'info');
+      if (!session || fheInstance || fheInitStarted.current) return;
+      
+      fheInitStarted.current = true;
+      console.log('Initializing FHE engine...');
 
-          // Initialize WASM modules (v0.4.1)
-          // thread: 1 disables multi-threaded WASM pool (avoids SES lockdown + browser crashes)
-          await initSDK({ thread: 1 });
+      try {
+        await initSDK({ thread: 1 });
 
-          // Create FHE instance with SepoliaConfig (relayer.testnet.zama.org)
-          // Use dedicated Sepolia RPC (not window.ethereum which may be on wrong network)
-          const config = {
-            ...SepoliaConfig,
-            network: RPC_SEPOLIA || 'https://sepolia.infura.io/v3/17d9c7c455364415a1d9186f7774517e',
-          };
-          const instance = await createInstance(config);
+        const config = {
+          ...SepoliaConfig,
+          network: RPC_SEPOLIA || 'https://eth-sepolia.public.blastapi.io',
+        };
 
-          setFheInstance(instance);
-          showAlert('FHE engine ready!', 'success');
-          console.log('FHE instance created:', instance);
-        } catch (e) {
-          console.error('Failed to initialize FHE:', e);
-          showAlert('Failed to initialize FHE engine: ' + e.message, 'error');
-        }
+        const instance = await createInstance(config);
+        setFheInstance(instance);
+        console.log('✅ FHE engine ready');
+        showAlert('FHE engine ready!', 'success');
+      } catch (e) {
+        console.error('❌ Failed to initialize FHE:', e);
+        showAlert('Failed to initialize FHE engine: ' + e.message, 'error');
+        fheInitStarted.current = false;
       }
     };
 
