@@ -186,7 +186,6 @@ function App() {
   }, [session, universalConnector, wordsMeta]);
 
   async function setSecretOnchainForSelf(index) {
-    console.log('=== MERKLE COMPATIBILITY CHECK ===');
     showAlert('Setting secret with real FHE data...', 'info');
 
     if (isSettingSecret) return;
@@ -211,6 +210,7 @@ function App() {
       const signer = await ethersProvider.getSigner();
       const signerAddress = await signer.getAddress();
       const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      const contractAddress = await contract.getAddress();
 
       if (session.address.toLowerCase() !== signerAddress.toLowerCase()) {
         throw new Error(
@@ -251,7 +251,7 @@ function App() {
         .map(ch => ch.charCodeAt(0) - 64);
 
       const input = fheInstance.createEncryptedInput(
-        CONTRACT_ADDRESS,
+        contractAddress,
         playerAddress
       );
 
@@ -261,16 +261,6 @@ function App() {
 
       const encodedHandles = handles.map(handle =>
         ethers.AbiCoder.defaultAbiCoder().encode(['(bytes32)'], [[handle]])
-      );
-
-      await contract.setEncryptedSecretWord.staticCall(
-        playerAddress,
-        actualIndex,
-        encodedHandles,
-        inputProof,
-        item.proof,
-        item.leaf,
-        { gasLimit: 5000000 }
       );
 
       const tx = await contract.setEncryptedSecretWord(
@@ -293,7 +283,9 @@ function App() {
       }
     } catch (e) {
       console.error('setSecretOnchainForSelf error:', e);
-      showAlert(e.message || 'Failed to set secret', 'error');
+      let msg = e.message || 'Failed to set secret';
+      if (e.data) msg += ` (Data: ${e.data.slice(0, 10)}...)`;
+      showAlert(msg, 'error');
     } finally {
       setIsSettingSecret(false);
     }
