@@ -481,9 +481,9 @@ FHEVMWordle/
 ### Deployed Contract (Sepolia Testnet)
 
 ```
-📍 Contract Address: 0xFA23f4beB2238261011Edec693e08871732a0108
+📍 Contract Address: 0xCb04B04fa31F7afF96C4Af38Cd40b0C38ae998b2
 🌐 Network: Sepolia (Chain ID: 11155111)
-🔍 Explorer: https://sepolia.etherscan.io/address/0xFA23f4beB2238261011Edec693e08871732a0108
+🔍 Explorer: https://sepolia.etherscan.io/address/0xCb04B04fa31F7afF96C4Af38Cd40b0C38ae998b2
 🌳 Merkle Root: 0xf8ee73c7257f661083f8bc64309b79cdbc6d3d37b24dc694eab774ae3120794b%
 📚 Dictionary: 5,756 valid English words
 ```

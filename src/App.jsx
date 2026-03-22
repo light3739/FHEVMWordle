@@ -41,14 +41,11 @@ const CONTRACT_ABI = [
   // === MAIN GAME FUNCTIONS ===
   'function startGame(bytes32 sessionHash)',
   'function submitGuess(uint8[5] guess)',
-  'function requestDecryptResults()',
-
   // === SECRET SETTING ===
-  'function setEncryptedSecretWord(address player, uint32 index, bytes[] encryptedLetters, bytes inputProof, bytes32[] merkleProof, bytes32 leaf)',
-  'function debugOneInput(bytes encryptedLetter, bytes inputProof)',
-
-  // ✅ ИСПРАВЛЕННАЯ СТРУКТУРА games() - ТОЧНО ПО КОНТРАКТУ:
-  'function games(address) view returns (uint256 gameId, address player, uint8 currentAttempt, uint8 status, uint256 startTime, uint256 endTime, bytes32 sessionHash, uint256 wordIndex, bool canRecover, uint256 pendingRequestId, bool secretSet)',
+  'function initialize(bytes32 inputValue, bytes calldata inputProof)',
+  'function getEncryptedResults(address player, uint8 ai) view returns (bytes32[5])',
+  'function setEncryptedSecretWord(address player, uint32 index, bytes32[] encryptedLetters, bytes calldata inputProof, bytes32[] merkleProof, bytes32 leaf)',
+  'function games(address) view returns (uint256 gameId, address player, uint8 currentAttempt, uint8 status, uint256 startTime, uint256 endTime, bytes32 sessionHash, uint256 wordIndex, bool canRecover, bool secretSet)',
 
   // === PAUSE MANAGEMENT ===
   'function pauseMyGame()',
@@ -92,6 +89,7 @@ function App() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [savedGameInfo, setSavedGameInfo] = useState(null);
   const [isCheckingForSavedGame, setIsCheckingForSavedGame] = useState(false);
+  const [fheKeypair, setFheKeypair] = useLocalStorage('fheKeypair', null);
   const { showAlert } = useAlert();
 
   const fheInitStarted = useRef(false);
@@ -107,15 +105,15 @@ function App() {
         await initSDK({ thread: 1 });
 
         const instance = await createInstance({
-          aclContractAddress: '0xf0Ffdc93b7E186bC2f8CB3dAA75D86d1930A433D',
-          kmsContractAddress: '0xbE0E383937d564D7FF0BC3b46c51f0bF8d5C311A',
+          aclContractAddress: process.env.REACT_APP_FHEVM_ACL || '0xf0Ffdc93b7E186bC2f8CB3dAA75D86d1930A433D',
+          kmsContractAddress: process.env.REACT_APP_FHEVM_KMS || '0xbE0E383937d564D7FF0BC3b46c51f0bF8d5C311A',
           inputVerifierContractAddress: '0xBBC1fFCdc7C316aAAd72E807D9b0272BE8F84DA0',
           verifyingContractAddressDecryption: '0x5D8BD78e2ea6bbE41f26dFe9fdaEAa349e077478',
           verifyingContractAddressInputVerification: '0x483b9dE06E4E4C7D35CCf5837A1668487406D955',
           chainId: 11155111,
           gatewayChainId: 10901,
           network: RPC_SEPOLIA,
-          relayerUrl: 'https://relayer.testnet.zama.org',
+          relayerUrl: process.env.REACT_APP_FHEVM_RELAYER || 'https://relayer.testnet.zama.org',
         });
 
         setFheInstance(instance);
@@ -301,10 +299,7 @@ function App() {
       letters.forEach(letter => input.add8(letter));
 
       const { handles, inputProof } = await input.encrypt();
-
-      const encodedHandles = handles.map(handle =>
-        ethers.AbiCoder.defaultAbiCoder().encode(['(bytes32)'], [[handle]])
-      );
+      const encodedHandles = handles.map(h => ethers.zeroPadValue(ethers.hexlify(h), 32));
 
       const tx = await contract.setEncryptedSecretWord(
         playerAddress,
@@ -371,14 +366,13 @@ function App() {
       const { handles, inputProof } = await input.encrypt();
       console.log('🧪 DEBUG: Encryption complete. Handles:', handles.length);
 
-      const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
-        ['(bytes32)'],
-        [[handles[0]]]
-      );
+      const handle = ethers.zeroPadValue(ethers.hexlify(handles[0]), 32);
 
       showAlert('📤 Sending debug transaction...', 'info');
       console.log('🧪 DEBUG: Sending transaction...');
-      const tx = await contract.debugOneInput(encoded, inputProof);
+      const tx = await contract.initialize(handle, inputProof, {
+        gasLimit: 1500000,
+      });
       console.log('🧪 DEBUG: Transaction hash:', tx.hash);
       
       showAlert('⏳ Waiting for confirmation...', 'info');
@@ -911,65 +905,6 @@ function App() {
     }
   };
 
-  const waitForDecryptionResults = async (
-    contract,
-    playerAddress,
-    fromBlock
-  ) => {
-    const INITIAL_WAIT_TIME = 2 * 60 * 1000; // 2 минуты
-    const POLL_INTERVAL = 5000; // Проверяем каждые 5 секунд
-    const startTime = Date.now();
-    let attempts = 0;
-    let notificationShown = false;
-
-    return new Promise((resolve, reject) => {
-      const checkForResults = async () => {
-        try {
-          attempts++;
-          const elapsedTime = Date.now() - startTime;
-
-          // Показываем уведомление через 2 минуты, но продолжаем ждать
-          if (elapsedTime > INITIAL_WAIT_TIME && !notificationShown) {
-            notificationShown = true;
-            showAlert(
-              'Decryption is taking longer than usual. This usually means Zama services might be experiencing issues. You can wait for the result or try starting a new game later.',
-              'warning'
-            );
-          }
-
-          // Показываем прогресс каждые 30 секунд после первых 2 минут
-          if (elapsedTime > INITIAL_WAIT_TIME && attempts % 6 === 0) {
-            const elapsedMinutes = Math.floor(elapsedTime / 60000);
-            showAlert(
-              `Still waiting for decryption... ${elapsedMinutes} minutes elapsed`,
-              'info'
-            );
-          }
-
-          // Ищем события GuessEvaluated для данного игрока
-          const filter = contract.filters.GuessEvaluated(playerAddress);
-          const events = await contract.queryFilter(filter, fromBlock);
-
-          if (events.length > 0) {
-            // Берем последнее событие
-            const latestEvent = events[events.length - 1];
-            const results = latestEvent.args.results.map(Number);
-            resolve(results);
-            return;
-          }
-
-          // Продолжаем ждать бесконечно (или до тех пор, пока пользователь не начнет новую игру)
-          setTimeout(checkForResults, POLL_INTERVAL);
-        } catch (error) {
-          console.error('Error while waiting for results:', error);
-          reject(error);
-        }
-      };
-
-      // Начинаем проверку
-      checkForResults();
-    });
-  };
   // Добавьте эту функцию в компонент:
   const handleForfeitGame = async () => {
     try {
@@ -1026,30 +961,96 @@ function App() {
         throw new Error('Transaction failed');
       }
 
-      showAlert('Requesting decryption...', 'info');
-      const decryptTx = await contract.requestDecryptResults();
-      const decryptReceipt = await decryptTx.wait();
+      const currentGame = await contract.games(session.address);
+      const attemptIndex = Number(currentGame.currentAttempt) - 1;
 
-      if (decryptReceipt.status !== 1) {
-        throw new Error('Decryption request failed');
-      }
-
-      showAlert('Waiting for decryption results...', 'info');
-      setWaitingForDecryption(true);
-
-      const results = await waitForDecryptionResults(
-        contract,
-        session.address,
-        decryptReceipt.blockNumber
-      );
+      showAlert('🔓 Decrypting results...', 'info');
+      const results = await decryptResults(contract, session.address, attemptIndex);
 
       if (results) {
         await processGuessResults(word, results);
-        showAlert('Results received!', 'success');
+        showAlert('Guess evaluated!', 'success');
       }
     } catch (error) {
       console.error('Contract interaction failed:', error);
       throw error;
+    }
+  };
+
+  const decryptResults = async (contract, playerAddress, attemptIndex) => {
+    try {
+      if (!fheInstance) throw new Error('FHE engine not initialized');
+      if (!universalConnector) throw new Error('Wallet not connected');
+
+      console.log('🧪 DEBUG: Decrypting results for attempt:', attemptIndex);
+
+      // 1. Get handles from contract
+      const handles = await contract.getEncryptedResults(playerAddress, attemptIndex);
+      console.log('🧪 DEBUG: Got handles:', handles);
+
+      // 2. Get or create keypair
+      let keypair = fheKeypair;
+      if (!keypair) {
+        console.log('🧪 DEBUG: Generating new FHE keypair...');
+        keypair = fheInstance.generateKeypair();
+        setFheKeypair(keypair);
+      }
+
+      // 3. Create EIP-712 for decryption request
+      const currentTime = Math.floor(Date.now() / 1000);
+      const duration = 1; // Valid for 1 day
+      const eip712 = fheInstance.createEIP712(
+        keypair.publicKey,
+        [CONTRACT_ADDRESS],
+        currentTime,
+        duration
+      );
+
+      // 4. Request signature from user
+      const provider = await universalConnector.connect();
+      const ethersProvider = new BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+
+      showAlert('🔐 Please sign the decryption request in your wallet...', 'info');
+      
+      // ethers v6 signTypedData(domain, types, value)
+      // Note: types should NOT include EIP712Domain
+      const { EIP712Domain, ...signingTypes } = eip712.types;
+      
+      const signature = await signer.signTypedData(
+        eip712.domain,
+        signingTypes,
+        eip712.message
+      );
+
+      showAlert('🔓 Processing decryption...', 'info');
+
+      // 5. Call userDecrypt
+      const handleContractPairs = handles.map(h => ({
+        handle: h,
+        contractAddress: CONTRACT_ADDRESS
+      }));
+
+      const resultsRecord = await fheInstance.userDecrypt(
+        handleContractPairs,
+        keypair.privateKey,
+        keypair.publicKey,
+        signature,
+        [CONTRACT_ADDRESS],
+        playerAddress,
+        currentTime,
+        duration
+      );
+
+      // 6. Map results back to array order
+      const results = handles.map(h => Number(resultsRecord[h]));
+
+      console.log('🧪 DEBUG: Decrypted results:', results);
+      return results;
+    } catch (e) {
+      console.error('❌ Decryption failed:', e);
+      showAlert('Decryption failed: ' + (e.message || e), 'error');
+      return null;
     }
   };
 
