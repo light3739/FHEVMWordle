@@ -193,7 +193,6 @@ function App() {
     setIsSettingSecret(true);
 
     try {
-      // Все проверки
       if (!session || !universalConnector) {
         showAlert('Connect wallet first', 'error');
         return;
@@ -207,133 +206,90 @@ function App() {
         return;
       }
 
-      const playerAddress = session.address;
-
       const provider = await universalConnector.connect();
       const ethersProvider = new BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
+      const signerAddress = await signer.getAddress();
       const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
-      // Получаем состояние игры
+      if (session.address.toLowerCase() !== signerAddress.toLowerCase()) {
+        throw new Error(
+          `Wallet/session mismatch: session=${session.address}, signer=${signerAddress}`
+        );
+      }
+
+      const playerAddress = signerAddress;
+
       const gameState = await contract.games(playerAddress);
       if (gameState.gameId.toString() === '0') {
         showAlert('No active game found. Please start a game first.', 'error');
         return;
       }
 
-      // Проверяем, не установлен ли секрет уже
       if (gameState.secretSet) {
         showAlert('Secret already set for this game!', 'warning');
         setIsSecretReady(true);
         return;
       }
 
-      const actualIndex = parseInt(gameState.wordIndex.toString());
+      const actualIndex = parseInt(gameState.wordIndex.toString(), 10);
       const item = wordsMeta.items[actualIndex];
-
-      console.log('=== ITEM CHECK ===');
-      console.log('actualIndex:', actualIndex);
-      console.log('item.word:', item?.word);
 
       if (!item) {
         throw new Error(`Index ${actualIndex} out of range in words.json`);
       }
 
-      // Проверяем root'ы
       const contractRoot = await contract.merkleRoot();
-      console.log('Contract root:', contractRoot);
-      console.log('File root:', wordsMeta.root);
-
       if (contractRoot !== wordsMeta.root) {
         showAlert('❌ ROOT MISMATCH! Old file cached!', 'error');
         return;
       }
 
-      console.log('✅ All basic checks passed');
-
-      // СРАЗУ создаем РЕАЛЬНЫЕ FHE данные
       const letters = item.word
         .toUpperCase()
         .split('')
         .map(ch => ch.charCodeAt(0) - 64);
-
-      console.log('=== GENERATING REAL FHE DATA ===');
-      console.log('Word:', item.word, 'Letters:', letters);
 
       const input = fheInstance.createEncryptedInput(
         CONTRACT_ADDRESS,
         playerAddress
       );
 
-      // Добавляем все элементы в ОДИН input batch
-      letters.forEach((letter, index) => {
-        console.log(`Adding letter ${index}: ${letter}`);
-        input.add8(letter);
-      });
-
-      console.log('Input prepared for', letters.length, 'letters');
+      letters.forEach(letter => input.add8(letter));
 
       const { handles, inputProof } = await input.encrypt();
 
-      // ✅ ПРАВИЛЬНОЕ КОДИРОВАНИЕ:
-      const encodedHandles = handles.map(handle => {
-        // Кодируем каждый handle как externalEuint8 структуру
-        return ethers.AbiCoder.defaultAbiCoder().encode(
-          ['(bytes32)'], // externalEuint8 структура
-          [[handle]] // handle как bytes32
-        );
-      });
+      const encodedHandles = handles.map(handle =>
+        ethers.AbiCoder.defaultAbiCoder().encode(['(bytes32)'], [[handle]])
+      );
 
-      console.log('✅ FHE encryption completed');
-      console.log('Handles count:', handles.length);
-      console.log('Encoded handles count:', encodedHandles.length);
+      await contract.setEncryptedSecretWord.staticCall(
+        playerAddress,
+        actualIndex,
+        encodedHandles,
+        inputProof,
+        item.proof,
+        item.leaf,
+        { gasLimit: 5000000 }
+      );
 
-      try {
-        console.log('DEBUG: Input proof length:', inputProof.length);
-        console.log('DEBUG: First 10 encoded handles:', encodedHandles.slice(0, 2));
+      const tx = await contract.setEncryptedSecretWord(
+        playerAddress,
+        actualIndex,
+        encodedHandles,
+        inputProof,
+        item.proof,
+        item.leaf,
+        { gasLimit: 8000000 }
+      );
 
-        await contract.setEncryptedSecretWord.staticCall(
-          playerAddress,
-          actualIndex,
-          encodedHandles,
-          inputProof,
-          item.proof,
-          item.leaf,
-          { gasLimit: 5000000 }
-        );
+      const receipt = await tx.wait();
 
-        console.log('✅ StaticCall validation PASSED!');
-        showAlert('Validation passed, sending transaction...', 'info');
-
-        const tx = await contract.setEncryptedSecretWord(
-          playerAddress,
-          actualIndex,
-          encodedHandles,
-          inputProof,
-          item.proof,
-          item.leaf,
-          { gasLimit: 8000000 }
-        );
-        console.log('Transaction sent:', tx.hash);
-        showAlert(`Transaction sent: ${tx.hash}`, 'info');
-
-        const receipt = await tx.wait();
-        console.log('Transaction status:', receipt.status);
-
-        if (receipt.status !== 0) {
-          showAlert('✅ Secret set successfully!', 'success');
-          setIsSecretReady(true);
-        } else {
-          throw new Error('Transaction execution reverted');
-        }
-      } catch (fheError) {
-        console.error('❌ Secret Setting Failed:', fheError);
-        let msg = fheError.message;
-        if (fheError.data) {
-          console.error('Error data:', fheError.data);
-          msg += ' (Data: ' + fheError.data.slice(0, 10) + '...)';
-        }
-        showAlert('Failed: ' + msg, 'error');
+      if (receipt.status === 1) {
+        showAlert('✅ Secret set successfully!', 'success');
+        setIsSecretReady(true);
+      } else {
+        throw new Error('Transaction execution reverted');
       }
     } catch (e) {
       console.error('setSecretOnchainForSelf error:', e);
