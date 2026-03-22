@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@fhevm/solidity": "0.8.0",
+    "@fhevm/solidity": "0.9.1",
     "@zama-fhe/relayer-sdk": "0.4.1",
     "@testing-library/jest-dom": "^5.16.3",
     "@testing-library/react": "^16.3.0",
