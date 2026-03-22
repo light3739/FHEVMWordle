@@ -45,6 +45,7 @@ const CONTRACT_ABI = [
 
   // === SECRET SETTING ===
   'function setEncryptedSecretWord(address player, uint32 index, bytes[] encryptedLetters, bytes inputProof, bytes32[] merkleProof, bytes32 leaf)',
+  'function debugOneInput(bytes encryptedLetter, bytes inputProof)',
 
   // ✅ ИСПРАВЛЕННАЯ СТРУКТУРА games() - ТОЧНО ПО КОНТРАКТУ:
   'function games(address) view returns (uint256 gameId, address player, uint8 currentAttempt, uint8 status, uint256 startTime, uint256 endTime, bytes32 sessionHash, uint256 wordIndex, bool canRecover, uint256 pendingRequestId, bool secretSet)',
@@ -190,6 +191,40 @@ function App() {
     }
   }, [session, universalConnector, wordsMeta]);
 
+  const switchNetwork = async () => {
+    if (!window.ethereum) return;
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0xaa36a7' }], // 11155111 in hex
+      });
+    } catch (switchError) {
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: '0xaa36a7',
+                chainName: 'Sepolia Test Network',
+                rpcUrls: ['https://sepolia.infura.io/v3/'],
+                nativeCurrency: {
+                  name: 'Sepolia ETH',
+                  symbol: 'ETH',
+                  decimals: 18,
+                },
+                blockExplorerUrls: ['https://sepolia.etherscan.io'],
+              },
+            ],
+          });
+        } catch (addError) {
+          console.error('Failed to add Sepolia network:', addError);
+        }
+      }
+      console.error('Failed to switch to Sepolia network:', switchError);
+    }
+  };
+
   async function setSecretOnchainForSelf(index) {
     showAlert('Setting secret with real FHE data...', 'info');
 
@@ -201,6 +236,9 @@ function App() {
         showAlert('Connect wallet first', 'error');
         return;
       }
+
+      // ✅ FORCE SWITCH TO SEPOLIA
+      await switchNetwork();
       if (!fheInstance) {
         showAlert('FHE engine is not ready yet.', 'error');
         return;
@@ -296,6 +334,64 @@ function App() {
     }
   }
 
+  async function debugOneInputTest() {
+    console.log('🧪 DEBUG: debugOneInputTest called');
+    
+    if (!fheInstance || !session || !universalConnector) {
+      const msg = `Dependencies missing: FHE=${!!fheInstance}, Session=${!!session}, UC=${!!universalConnector}`;
+      console.warn('🧪 DEBUG:', msg);
+      showAlert(msg, 'error');
+      return;
+    }
+
+    showAlert('🧪 Starting isolated input test...', 'info');
+    console.log('🧪 DEBUG: All dependencies present. Connecting provider...');
+
+    try {
+      const provider = await universalConnector.connect();
+      console.log('🧪 DEBUG: Provider connected. Getting signer...');
+      
+      const ethersProvider = new BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+      const signerAddress = await signer.getAddress();
+      const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      const contractAddress = await contract.getAddress();
+      console.log('🧪 DEBUG: Signer address:', signerAddress);
+      console.log('🧪 DEBUG: Contract address:', contractAddress);
+
+      showAlert('🔐 Encrypting test value (5)...', 'info');
+      console.log('🧪 DEBUG: Creating encrypted input...');
+      const input = fheInstance.createEncryptedInput(
+        contractAddress,
+        signerAddress
+      );
+      input.add8(5); // Test value
+
+      console.log('🧪 DEBUG: Calling input.encrypt()...');
+      const { handles, inputProof } = await input.encrypt();
+      console.log('🧪 DEBUG: Encryption complete. Handles:', handles.length);
+
+      const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
+        ['(bytes32)'],
+        [[handles[0]]]
+      );
+
+      showAlert('📤 Sending debug transaction...', 'info');
+      console.log('🧪 DEBUG: Sending transaction...');
+      const tx = await contract.debugOneInput(encoded, inputProof);
+      console.log('🧪 DEBUG: Transaction hash:', tx.hash);
+      
+      showAlert('⏳ Waiting for confirmation...', 'info');
+      await tx.wait();
+      
+      console.log('🧪 DEBUG: Transaction confirmed!');
+      showAlert('✅ Isolated input test passed!', 'success');
+    } catch (e) {
+      console.error('🧪 DEBUG: ERROR in test:', e);
+      showAlert('❌ Isolated input test failed: ' + (e.reason || e.message), 'error');
+    }
+  }
+
   const [blockAutoReconnect, setBlockAutoReconnect] = useState(false);
   const [boardState, setBoardState] = useLocalStorage('boardState', {
     guesses: [],
@@ -360,41 +456,6 @@ function App() {
     })();
   }, [showAlert]);
 
-  // Ensure Sepolia network (chainId 11155111)
-  const ensureSepolia = async provider => {
-    const targetHex = '0xaa36a7';
-    try {
-      await provider.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: targetHex }],
-      });
-    } catch (err) {
-      if (err?.code === 4902) {
-        await provider.request({
-          method: 'wallet_addEthereumChain',
-          params: [
-            {
-              chainId: targetHex,
-              chainName: 'Sepolia',
-              nativeCurrency: {
-                name: 'SepoliaETH',
-                symbol: 'ETH',
-                decimals: 18,
-              },
-              rpcUrls: [RPC_SEPOLIA],
-              blockExplorerUrls: ['https://sepolia.etherscan.io'],
-            },
-          ],
-        });
-        await provider.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: targetHex }],
-        });
-      } else {
-        throw err;
-      }
-    }
-  };
   // Wallet state
 
   // Open wallet modal if no session; close if session exists
@@ -552,16 +613,13 @@ function App() {
         Promise.reject(new Error('Connect not available')));
 
       // 1) Принудительный свитч сети на Sepolia
-      await ensureSepolia(provider);
+      await switchNetwork();
 
       // 2) Оборачиваем в ethers v6
       const ethersProvider = new BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
       const address = await signer.getAddress();
       const { chainId } = await ethersProvider.getNetwork();
-      if (chainId !== 11155111) {
-        showAlert('Please switch to Sepolia network in your wallet', 'warning');
-      }
 
       // Сохраняем сессию независимо от сети
       const newSession = { address, chainId };
@@ -796,6 +854,9 @@ function App() {
       setCurrentSessionHash(sessionHash);
       showAlert('Starting game...', 'info');
 
+      // ✅ FORCE SWITCH TO SEPOLIA
+      await switchNetwork();
+
       const tx = await contract.startGame(sessionHash);
       showAlert('Transaction sent! Waiting for confirmation...', 'info');
 
@@ -917,6 +978,7 @@ function App() {
       const signer = await ethersProvider.getSigner();
       const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
+      await switchNetwork();
       const tx = await contract.forfeitGame();
       showAlert('Forfeiting game...', 'info');
       await tx.wait();
@@ -951,6 +1013,9 @@ function App() {
       const guessArray = wordToNums(word);
 
       showAlert('Submitting word...', 'info');
+
+      // ✅ FORCE SWITCH TO SEPOLIA
+      await switchNetwork();
 
       const tx = await contract.submitGuess(guessArray);
       showAlert('Word submitted! Processing...', 'info');
@@ -1118,6 +1183,33 @@ function App() {
       />
       <Alert />
 
+      {/* ✅ КНОПКА ТЕСТА FHE - ПОЯВЛЯЕТСЯ КОГДА WALLET + FHE ГОТОВЫ */}
+      {session && fheInstance && (
+        <div style={{ textAlign: 'center', margin: '14px 0' }}>
+          <button
+            onClick={debugOneInputTest}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#8b5cf6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#7c3aed'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#8b5cf6'; e.currentTarget.style.transform = 'translateY(0)'; }}
+          >
+            🧪 Test FHE Stack (Isolated Input)
+          </button>
+          <div style={{ fontSize: '11px', color: '#787c7e', marginTop: '6px' }}>
+            Verify FHE encryption before starting the game
+          </div>
+        </div>
+      )}
+
       {isTutorialMode ? (
         <TutorialMode />
       ) : !isGameStarted ? (
@@ -1253,6 +1345,7 @@ function App() {
               >
                 🏳️ Forfeit Game
               </button>
+
             </div>
 
             {/* ✅ РАСШИРЕННЫЙ ИНДИКАТОР СОСТОЯНИЯ ИГРЫ */}
